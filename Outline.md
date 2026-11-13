@@ -1,5 +1,12 @@
 # Outline - Photochrom Comparison Tool
 
+Goal of this project: creating a research environment for art history.
+
+- From close reading images to distant reading: crafting research questions, finding answers by tagging and comparing subsets
+- Image inspection in the smallest detail, revealing the secrets of their fabrication
+- Color analysis and comparison of two images
+- Comparison of image pairs
+
 ## Project setup
 
 Each feature is implemented in a separate feature branch. The main branch is always deployable and contains the latest stable version.
@@ -20,15 +27,41 @@ The site consists of 3 tabs:
 
 ### Media Library Tab
 
-- **Media Gallery of Picture Set**
-- **Image analyses over time** by plotting metadata of all images over time
+The start page: the whole collection (9,604 records) as filters and an image mosaic. Here users choose the main images (left side) for pairing.
+
+- **Date filter** (compact, in the filter panel): a tiny histogram of works per year, a range slider with two handles and START/END fields. The axis is fixed to 1889–1914. A record matches if its date range overlaps the selection. Option "exact dates only". Histogram: dark = dated to a single year, light = date spans spread evenly over their years (an estimate).
+- **Date rules** (`scripts/build_catalog.py`): photochrom production ended 1914, so records starting after 1914 are excluded from the catalog (6 records). Ranges ending after 1914 are cut at 1914 (flag `capped`), open ends ("after 1905") end at 1914 (flag `open`). Probable typos in catalog dates are flagged `suspect`, not corrected, and excluded by the date filter. The catalogued date is always shown as well.
+- **Filter pills**: genre, country, image content, source (with IIIF image, reproduces a painting). OR within a group, AND between groups; each pill shows its count given the other filters. Free-text search over title, place, country and MMS ID.
+- **Views**: *Mosaic* (default) shows the filtered works as uniform image tiles; *List* shows the work list with sortable columns. Both use virtual scrolling (only visible rows are in the page) and share the selection. Click a tile or row for details.
+- **Selection**: the checkbox on a tile or row makes the work a main image for the Pair Matching tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Kept in the browser only (localStorage), with export (CSV, JSON) and import.
+- **Images**: thumbnails come from an own static IIIF level 0 service (`scripts/build_thumbs_iiif.py`, separate repository [photochrom-images](https://github.com/eliaskreyenbuehl/photochrom-images) on GitHub Pages), so scrolling does not load hundreds of images from e-rara. The detail panel loads the larger image from e-rara IIIF where available.
+- **Image analyses over time**: the date histogram is the first step; later e.g. color values over time.
+
+Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` (about 0.9 MB compressed), which all tabs share.
 
 ### Pair matching Tab
 
-- **Use metadata** to match images to pairs
-- **Use image similarity** to match images
-- **Display pairs as gallery** and add option to open in comparison tab
-- **Allow for running custom scripts** on the image data (LLM could produce that script based on user prompt)
+Comparing images side by side is one of the key methods in art history. This tab creates candidate pairs for the Image Comparison tab.
+
+The left image is always a main image from the Photochrom collection. The right image can be:
+
+- another image from the same collection that is related to the main image in some way
+- an image from another collection, a museum, Wikimedia Commons or any other web resource
+- an image uploaded by the user
+
+Candidates are found through the following features:
+
+- **Wikidata match**: both images are linked to the same Wikidata entity
+- **Metadata and image content**: matching metadata fields and depicted content (e.g. sky, boat, snowy mountain peaks)
+- **Image similarity**: visual similarity of the images (e.g. image embeddings)
+- **Color relation**: some kind of color relation, to be defined in the image analysis section
+- **User annotations**: tags that users create themselves in the Image Comparison tab
+- **Skill and MCP** *(future development, not possible on a static site)*: the user tells Claude what they want to compare, and Claude enriches the data if needed
+
+Output and extensions:
+
+- **Display pairs as gallery** with an option to open a pair in the Image Comparison tab
+- **Allow for running custom scripts** on the image data (an LLM could produce the script from a user prompt)
 
 ### Image Comparison Tab
 
@@ -78,7 +111,7 @@ index.html                page shell: header, tab bar (nav.tab-bar), panel conta
 css/styles.css            global styles + CSS variables (--bg, --fg, --muted, --accent, --border)
 js/main.js                registers tabs, builds tab buttons/panels, handles switching; exports showTab(id)
 js/config.js              SAMPLE_METADATA_URL, SAMPLE_IMAGE_DIR, DEFAULT_PAIR_ID — where the sample pairs come from
-js/state.js               shared state between tabs: setComparisonPair() / onComparisonPairChange()
+js/state.js               shared state between tabs: Media Library selection (localStorage) and the comparison pair (setComparisonPair() / onComparisonPairChange())
 js/lib/csv.js             CSV parser (quoted fields), loadCsvObjects(url)
 js/lib/plotly.js          loadPlotly(): lazy-loads Plotly from its CDN on first use
 js/lib/opencv.js          loadOpenCV(): lazy-loads OpenCV.js (~10 MB) for auto-align
@@ -109,7 +142,18 @@ js/tabs/comparison/       sub-modules of the comparison tab
   pixels.js                 image loading, pixel extraction, seeded sampling
   palette.js                palette extraction (k-means in Lab)
   cie1931.js                CIE 1931 spectral locus + chromaticity diagram background
-js/tabs/media-library.js  Media Library tab
+js/lib/catalog.js         loadCatalog() for data/catalog.json, thumbnail/IIIF image URLs (THUMB_IIIF_BASE), links, date labels
+js/tabs/media-library.js  Media Library tab: wires the modules below together
+js/tabs/media-library/
+  filters.js                filter model, matching, facet counts (no DOM)
+  date-filter.js            compact date filter: tiny histogram, two-handle slider, START/END
+  mosaic.js                 virtual-scrolling image mosaic with checkboxes
+  list.js                   virtual-scrolling work list with checkboxes
+  details.js                detail panel for one record
+  exchange.js               export/import of the selection (CSV, JSON)
+css/media-library.css     styles of the Media Library (and candidate cards in Pair Matching)
+scripts/build_catalog.py  builds data/catalog.json from the Zenodo CSVs (run after data updates)
+scripts/build_thumbs_iiif.py  builds static IIIF level 0 thumbnails for the photochrom-images repository
 js/tabs/pair-matching.js  Pair Matching tab
 .nojekyll                 disables Jekyll processing on GitHub Pages
 ```
@@ -158,7 +202,7 @@ showTab('comparison');
 
 ### Image Comparison tab: how it works
 
-- **State**: `comparison/store.js` holds the tab state. Change it only via `update(patch, reason)`; subscribers update only what the reason (`'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'divider' | 'adjust' | 'diff'`) affects — dragging the overlay fires `'transform'` on every pointer move, so that path must stay cheap (no layout reads, no DOM rebuilding).
+- **State**: `comparison/store.js` holds the tab state. Change it only via `update(patch, reason)`; subscribers update only what the reason (`'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'blend' | 'divider' | 'adjust' | 'diff'`) affects — dragging the overlay fires `'transform'` on every pointer move, so that path must stay cheap (no layout reads, no DOM rebuilding).
 - **Per-view visibility**: the panel carries `data-view`; mark elements with `data-only="overlay slider"` etc. and CSS hides them in other views. Don't toggle `hidden` per view in JS.
 - **One geometric model**: a 3×3 homography `H` maps overlay *natural* pixels to base natural pixels. Auto-align sets `H`; manual move/scale/rotate is applied on top (`overlayMatrix()`). Swapping which image is on top inverts the matrix, so the alignment survives. All geometry is in natural pixels; convert to screen only at the edges (`geo.vs` × zoom).
 - **Display vs. export**: the viewer shows downscaled display canvases (≤ 4096 px) and positions the overlay with CSS `matrix3d()` (cheap, supports perspective). Screenshots (from the original images) and the difference map warp pixels in JS (`warp.js`).
