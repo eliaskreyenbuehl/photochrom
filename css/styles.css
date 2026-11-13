@@ -4,9 +4,30 @@
   --muted: #6b6b6b;
   --accent: #2f5d8a;
   --border: #d9d6cf;
+  --surface: #ffffff;
+  --surface-2: #ebe8e2;
+  --danger: #b42318;
+  --radius: 4px;
 }
 
 * { box-sizing: border-box; }
+
+/* Components set their own display; keep the hidden attribute authoritative. */
+[hidden] { display: none !important; }
+
+/* Page behind an open modal dialog does not scroll. */
+html.has-modal { overflow: hidden; }
+
+/* Text for screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
 body {
   margin: 0;
@@ -54,4 +75,809 @@ body {
 
 .tab-panel { padding: 1.5rem; }
 
+@media (max-width: 640px) {
+  .app-header { padding: 0.75rem 1rem 0; }
+  .tab-bar { overflow-x: auto; }
+  .tab-bar button { flex: none; }
+  .tab-panel { padding: 1rem; }
+}
+
 .placeholder { color: var(--muted); }
+
+/* ---------------------------------------------------------------------------
+   Image Comparison tab (js/tabs/comparison.js, js/tabs/comparison/*) */
+
+/* Shared controls */
+#panel-comparison fieldset { min-inline-size: 0; }
+
+#panel-comparison select,
+#panel-comparison input { max-width: 100%; }
+
+#panel-comparison .control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#panel-comparison select,
+#panel-comparison input[type="number"] {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--fg);
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+#panel-comparison select:focus-visible,
+#panel-comparison input:focus-visible,
+#panel-comparison summary:focus-visible,
+#panel-comparison .button:focus-visible,
+#panel-comparison .cmp-stage:focus-visible,
+#panel-comparison .cmp-frame:focus-visible,
+#panel-comparison .cmp-tool:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#panel-comparison .button {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+#panel-comparison .button:hover:not(:disabled) { border-color: var(--accent); }
+#panel-comparison .button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#panel-comparison .button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+#panel-comparison .button-primary:hover:not(:disabled) { background: #264d73; }
+#panel-comparison .button-small { font-size: 0.8rem; padding: 0.25rem 0.55rem; }
+
+#panel-comparison .segmented {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+#panel-comparison .segmented legend {
+  padding: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#panel-comparison .segmented label { position: relative; }
+
+#panel-comparison .segmented input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+#panel-comparison .segmented label > span {
+  display: block;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.95rem;
+}
+
+#panel-comparison .segmented label + label > span { border-left: none; }
+#panel-comparison .segmented label:first-of-type > span { border-radius: var(--radius) 0 0 var(--radius); }
+#panel-comparison .segmented label:last-of-type > span { border-radius: 0 var(--radius) var(--radius) 0; }
+
+#panel-comparison .segmented input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+#panel-comparison .segmented input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#panel-comparison .segmented input:disabled + span {
+  color: var(--muted);
+  background: var(--bg);
+  cursor: not-allowed;
+}
+
+#panel-comparison .is-error { color: var(--danger); }
+
+/* Toolbar + layout */
+#panel-comparison .cmp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+}
+
+#panel-comparison .cmp-toolbar .button { margin-left: auto; }
+
+#panel-comparison .cmp-status {
+  min-height: 1.25rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+#panel-comparison .cmp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+#panel-comparison.is-loading .cmp-layout { opacity: 0.5; }
+
+#panel-comparison .cmp-sidebar {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 960px) {
+  #panel-comparison .cmp-layout { grid-template-columns: minmax(0, 1fr); }
+  #panel-comparison .cmp-sidebar { position: static; max-height: none; }
+}
+
+/* Viewer */
+#panel-comparison .cmp-side-view {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  #panel-comparison .cmp-side-view { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* data-only="<views>": shown only in the listed views (data-view is set on the panel). */
+#panel-comparison[data-view="side"] [data-only]:not([data-only~="side"]),
+#panel-comparison[data-view="overlay"] [data-only]:not([data-only~="overlay"]),
+#panel-comparison[data-view="slider"] [data-only]:not([data-only~="slider"]),
+#panel-comparison[data-view="diff"] [data-only]:not([data-only~="diff"]) { display: none; }
+
+#panel-comparison .cmp-figure { margin: 0; }
+
+#panel-comparison .cmp-frame {
+  display: flex;
+  min-height: 200px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Zoom wrappers span the viewport (Panzoom expects that) and center the picture. */
+#panel-comparison .cmp-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+#panel-comparison .cmp-frame .cmp-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
+}
+
+#panel-comparison .cmp-figure figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+}
+
+#panel-comparison .cmp-title {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fg);
+  text-align: left;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+#panel-comparison .cmp-title:hover { text-decoration-color: currentColor; }
+#panel-comparison .cmp-year { color: var(--muted); }
+
+#panel-comparison .cmp-stage {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+
+#panel-comparison .cmp-stage-inner {
+  --inv-zoom: 1; /* 1 / zoom, set by the viewer */
+  position: relative;
+  flex: none;
+  overflow: hidden;
+}
+
+#panel-comparison .cmp-base-holder,
+#panel-comparison .cmp-overlay-clip {
+  position: absolute;
+  inset: 0;
+}
+
+#panel-comparison .cmp-stage .cmp-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: none;
+  transform-origin: 0 0;
+}
+
+#panel-comparison .cmp-diff-layer,
+#panel-comparison .cmp-diff-boxes {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Region boxes: sizes divided by the zoom so they stay 2 px / label-sized on screen.
+   Box shadows instead of borders: borders below 1 px are rounded up before zooming. */
+#panel-comparison .cmp-diff-box {
+  position: absolute;
+  box-shadow:
+    inset 0 0 0 calc(2px * var(--inv-zoom)) #e34948,
+    0 0 0 calc(2px * var(--inv-zoom)) rgba(255, 255, 255, 0.9);
+}
+
+#panel-comparison .cmp-diff-box span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.1rem 0.35rem;
+  transform: scale(var(--inv-zoom));
+  transform-origin: 0 0;
+  background: #1f1f1f;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Slider divider: in the stage (screen space), so it is never zoomed or moved off screen. */
+#panel-comparison .cmp-divider {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  cursor: ew-resize;
+}
+
+/* Wider invisible hit area for dragging the divider. */
+#panel-comparison .cmp-divider::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 28px;
+  transform: translateX(-50%);
+}
+
+#panel-comparison .cmp-divider-grip {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+#panel-comparison .cmp-divider-grip::before {
+  content: "\2039\00a0\203A";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  color: var(--fg);
+}
+
+/* Viewer toolbar (zoom + mouse tool) */
+#panel-comparison .cmp-viewer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .cmp-toolset {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+#panel-comparison .cmp-viewer-toolbar [data-action="link"] { margin-left: auto; }
+
+#panel-comparison .cmp-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+#panel-comparison .cmp-tool:hover:not(:disabled) { background: var(--surface-2); }
+#panel-comparison .cmp-tool[aria-pressed="true"] { background: var(--accent); color: #fff; }
+#panel-comparison .cmp-tool:disabled { color: var(--muted); opacity: 0.5; cursor: not-allowed; }
+
+#panel-comparison .cmp-zoom-level {
+  min-width: 3rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#panel-comparison .cmp-stage-hint {
+  margin: 0.5rem 0 0;
+  max-width: 80ch;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Sidebar */
+#panel-comparison .cmp-group {
+  margin-bottom: 0.75rem;
+  padding: 0 0.9rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .cmp-group summary {
+  padding: 0.6rem 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#panel-comparison .cmp-group:not([open]) { padding-bottom: 0; }
+
+#panel-comparison .range-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.5rem;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+}
+
+#panel-comparison .range-row output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#panel-comparison .range-row input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+#panel-comparison .offset-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+#panel-comparison .offset-row input { width: 100%; }
+
+#panel-comparison .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+#panel-comparison .cmp-check { margin-top: 0.6rem; }
+#panel-comparison .cmp-check label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+#panel-comparison .cmp-check input { margin: 0; accent-color: var(--accent); }
+#panel-comparison .cmp-check .cmp-note { margin: 0.2rem 0 0; }
+
+#panel-comparison .cmp-align-status,
+#panel-comparison .cmp-diff-summary {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+}
+
+#panel-comparison .cmp-align-status:empty { display: none; }
+
+#panel-comparison .cmp-overlap {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+#panel-comparison .cmp-overlap h4 { margin: 0 0 0.3rem; font-size: 0.85rem; }
+#panel-comparison .cmp-overlap ul { margin: 0; padding-left: 1.1rem; }
+
+#panel-comparison .cmp-overlap-hint,
+#panel-comparison .cmp-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#panel-comparison .cmp-diff-regions {
+  margin: 0.4rem 0 0;
+  padding-left: 1.4rem;
+  font-size: 0.85rem;
+}
+
+#panel-comparison .cmp-adjust-target { margin-top: 0.5rem; }
+#panel-comparison .cmp-adjust-target label { flex: 1; text-align: center; }
+#panel-comparison .cmp-adjust { margin-top: 0.75rem; }
+#panel-comparison .cmp-adjust .button { margin-top: 0.6rem; }
+
+/* Metadata */
+#panel-comparison .analysis {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+#panel-comparison .analysis h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+
+/* Image dialog (full image + metadata) */
+#panel-comparison .cmp-dialog {
+  width: min(1400px, 95vw);
+  height: min(900px, 92vh);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .cmp-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+#panel-comparison .cmp-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+
+#panel-comparison .cmp-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+#panel-comparison .cmp-dialog-head h3 { margin: 0; font-size: 1.15rem; }
+#panel-comparison .cmp-dialog-role,
+#panel-comparison .cmp-dialog-year { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+/* Image | divider | metadata; the metadata width is set by the divider (--meta-width). */
+#panel-comparison .cmp-dialog-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto min(var(--meta-width, 420px), calc(100% - 250px));
+}
+
+#panel-comparison .cmp-dialog-split {
+  position: relative;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+/* Grip in the middle of the divider. */
+#panel-comparison .cmp-dialog-split::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 3px;
+  height: 2.5rem;
+  transform: translateY(-50%);
+  border-left: 1px solid var(--muted);
+  border-right: 1px solid var(--muted);
+}
+
+#panel-comparison .cmp-dialog-split:hover,
+#panel-comparison .cmp-dialog-split.is-dragging { background: var(--surface-2); }
+
+#panel-comparison .cmp-dialog-split:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+#panel-comparison .cmp-dialog-figure {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+#panel-comparison .cmp-dialog-viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .cmp-dialog-viewport .cmp-zoom { height: 100%; }
+
+#panel-comparison .cmp-dialog-viewport img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+#panel-comparison .cmp-dialog-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#panel-comparison .cmp-dialog-figure figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#panel-comparison .cmp-dialog-info {
+  container-type: inline-size;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 1rem 1rem;
+}
+
+#panel-comparison .cmp-dialog-credit { margin: 0 0 1rem; font-size: 0.85rem; }
+
+@media (max-width: 800px) {
+  #panel-comparison .cmp-dialog-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    overflow-y: auto;
+  }
+
+  #panel-comparison .cmp-dialog-viewport { flex: none; height: 60vh; }
+  #panel-comparison .cmp-dialog-split { display: none; }
+
+  #panel-comparison .cmp-dialog-info { border-top: 1px solid var(--border); overflow: visible; }
+}
+
+/* Metadata list (image dialog) */
+/* Key fields: label | value, the label column at most 40 % wide. */
+#panel-comparison .meta-key {
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+  gap: 0.3rem 1rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* All fields: raw column names are long, so the name sits above its value. */
+#panel-comparison .meta-all { margin: 0.5rem 0 0; font-size: 0.85rem; }
+#panel-comparison .meta-all dt { margin-top: 0.6rem; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
+
+/* Narrow metadata panel: stack label and value in the key fields too. */
+@container (max-width: 340px) {
+  #panel-comparison .meta-key { display: block; }
+  #panel-comparison .meta-key dt { margin-top: 0.6rem; }
+}
+
+#panel-comparison .cmp-meta dt { color: var(--muted); overflow-wrap: anywhere; }
+#panel-comparison .cmp-meta dd { margin: 0; overflow-wrap: anywhere; }
+#panel-comparison .cmp-meta dd ul { margin: 0; padding-left: 1rem; }
+#panel-comparison .cmp-meta details { margin-top: 0.75rem; }
+#panel-comparison .cmp-meta summary { color: var(--accent); cursor: pointer; font-size: 0.875rem; }
+
+/* Color analysis */
+#panel-comparison .analysis h4 { margin: 0; font-size: 1rem; }
+
+#panel-comparison .analysis-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+}
+
+#panel-comparison .analysis-description,
+#panel-comparison .analysis-note {
+  margin: 0.75rem 0 0;
+  max-width: 70ch;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+#panel-comparison .analysis-status {
+  min-height: 1.25rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+#panel-comparison .analysis-plot {
+  min-height: 680px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .analysis-palette-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin-top: 2rem;
+}
+
+#panel-comparison .analysis-palettes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+#panel-comparison .palette-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+#panel-comparison .palette h5 { margin: 0; font-size: 0.95rem; }
+#panel-comparison .palette-actions { display: flex; gap: 0.4rem; }
+
+/* Palette bar: one block per color, width = share, hex + share inside. */
+#panel-comparison .palette-bar {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#panel-comparison .palette-seg {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+  min-width: 4px;
+  min-height: 3.5rem;
+  padding: 0.4rem 0.45rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+/* The select button covers the whole block; text and copy button sit on top. */
+#panel-comparison .palette-swatch {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  color: inherit; /* selection ring uses the block's text color */
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+#panel-comparison .palette-swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 3px currentColor; }
+
+#panel-comparison .palette-hex,
+#panel-comparison .palette-share {
+  position: relative;
+  pointer-events: none;
+}
+
+#panel-comparison .palette-hex {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+#panel-comparison .palette-hex code { font: inherit; font-weight: 600; }
+
+#panel-comparison .palette-copy {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  opacity: 0.75;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+#panel-comparison .palette-copy:hover { opacity: 1; background: rgba(127, 127, 127, 0.3); }
+
+#panel-comparison .palette-swatch:focus-visible,
+#panel-comparison .palette-copy:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -3px;
+}
+
+#panel-comparison .palette-copy:focus-visible { outline-offset: 0; opacity: 1; }
+
+#panel-comparison .palette-preview {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 0.75rem;
+  border-radius: var(--radius);
+}
+
+#panel-comparison .palette-feedback {
+  min-height: 1.2em;
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}

@@ -2,7 +2,18 @@
 //
 // selection      MMS IDs chosen in the Media Library as main images (left side of a pair).
 //                Kept in this browser only (localStorage), never sent anywhere.
-// comparisonPair the pair currently shown in the Image Comparison tab.
+// comparisonPair the pair currently shown in the Image Comparison tab. To open a pair there:
+//                  setComparisonPair(pair); showTab('comparison');   // showTab from js/main.js
+//
+// Pair shape (see js/tabs/comparison/pairs.js for how the sample pairs are built):
+//   {
+//     id: 'gleyre-le-soir',          // unique id, used in screenshot file names
+//     label: 'Gleyre – Le Soir',     // shown in the pair selector
+//     left:  { role, label, title, year, url, credit, creditUrl, fields },
+//     right: { role, label, title, year, url, credit, creditUrl, fields },
+//   }
+//   role: 'original' | 'photochrom'; label: 'Original' / 'Photochrom';
+//   title, year: shown under the image; fields: all metadata { column: value }
 
 const SELECTION_KEY = 'photochrom.selection.v1';
 
