@@ -32,7 +32,7 @@ The start page: the whole collection (9,604 records) as filters and an image mos
 - **Filter pills**: genre, country, image content, source (with IIIF image, reproduces a painting). OR within a group, AND between groups; each pill shows its count given the other filters. Free-text search over title, place, country and MMS ID.
 - **Views**: *Mosaic* (default) shows the filtered works as uniform image tiles; *List* shows the work list with sortable columns. Both use virtual scrolling (only visible rows are in the page) and share the selection. Click a tile or row for details.
 - **Selection**: the checkbox on a tile or row makes the work a main image for the Pair Matching tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Kept in the browser only (localStorage), with export (CSV, JSON) and import.
-- **Images**: thumbnails come from an own static IIIF level 0 service (`scripts/build_thumbs_iiif.py`, separate repository [photochrom-images](https://github.com/eliaskreyenbuehl/photochrom-images) on GitHub Pages), so scrolling does not load hundreds of images from e-rara. The detail panel loads the larger image from e-rara IIIF where available.
+- **Images**: thumbnails come from an own static IIIF level 0 service, so scrolling does not load hundreds of images from e-rara. Sources and URLs for all sizes: see [Images: sources and URLs](#images-sources-and-urls).
 - **Image analyses over time**: the date histogram is the first step; later e.g. color values over time.
 
 Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` (about 0.9 MB compressed), which all tabs share.
@@ -99,6 +99,67 @@ Use a plotting library like Plotly or Chart.js for the plots.
 - **Generate color palette for image**
 - **Highlight color palette in image** (highlight the colors of the palette in the image when clicking on it)
 - **Option to copy color palette to clipboard** (as hex values or as image)
+
+## Images: sources and URLs
+
+Every record in `data/catalog.json` has the field `img` (image file name without extension, also the identifier of all image services) and `s` (subset). Recatalogued records (`s = "r"`, 1,946) also have `iiif` (e-rara IIIF base URL); legacy records (`s = "l"`, 7,658) have no IIIF service at the ZB.
+
+| Use | Recatalogued (`rec.iiif`) | Legacy (`rec.img`) |
+|---|---|---|
+| **Thumbnail** (mosaic, lists, cards), 300 px | `https://eliaskreyenbuehl.github.io/photochrom-images/iiif/<img>/full/300,/0/default.jpg` (own static IIIF 2.1 level 0, all 9,591 images; `info.json` next to it; **only width 300 exists**) | same |
+| **Detail / comparison**, any size | `<iiif>/full/<w>,/0/default.jpg`, e.g. `!2000,2000` (best fit). e-rara is IIIF 2.1 **level 2**: regions (`x,y,w,h`, `pct:x,y,w,h`), sizes, rotation | `https://huggingface.co/datasets/eliaskre/photochrom-legacy-2k/resolve/main/images/<img>.jpg`: the whole 2K scan (about 2,000 px wide, median 620 KB). **No other sizes, no regions, no tiles** |
+| **Deep zoom** (OpenSeadragon) | tile source `<iiif>/info.json` | `{ type: 'image', url: <2K URL> }`, zoom happens in the browser |
+| **Full resolution** | `<iiif>/full/full/0/default.jpg` (4K scan, large) | the 2K scan is the largest version online (Zenodo has the same) |
+
+**In code** use the helpers in `js/lib/catalog.js`, never build URLs by hand:
+
+- `imageUrl(rec, 300)`: thumbnail (own service; falls back to e-rara only if `THUMB_IIIF_BASE` is empty)
+- `fullImageUrl(rec, maxSize = 2000)`: image for comparison and color analysis (e-rara scaled, or the 2K legacy scan)
+- `zoomSource(rec)`: OpenSeadragon tile source
+- `largeImageUrl(rec, 600)`: medium image for the detail panel
+
+**Rules**
+
+- **CORS:** see the next section; all three image hosts allow it.
+- **Spare e-rara** (production system of the ZB): only single images on demand (detail, comparison, zoom). Never load lists, mosaics or batch analyses from e-rara; use the thumbnail service.
+- **Hugging Face** answers with a 302 redirect to a signed CDN URL; use the stable `resolve/main/...` URL, never the CDN URL (it expires). First load about 1–1.5 s.
+- **Print area:** apply the box from `data/print-area.csv` (see next section) to every image, so color charts are not shown or analyzed. On e-rara the box can be requested as region `pct:x,y,w,h`; for thumbnails and legacy scans crop on canvas.
+- **Rights and credit:** photochroms are Public Domain Mark 1.0. Credit line: "Zentralbibliothek Zürich, Photochrom Collection" with the DOI (`rec.doi`) or the swisscollections link.
+- **Hosting:** thumbnails in the GitHub repository [photochrom-images](https://github.com/eliaskreyenbuehl/photochrom-images) (`scripts/build_thumbs_iiif.py`), legacy 2K scans in the Hugging Face dataset [eliaskre/photochrom-legacy-2k](https://huggingface.co/datasets/eliaskre/photochrom-legacy-2k) (`scripts/upload_legacy_2k_hf.py`, unchanged copies from Zenodo `images-legacy-2k.zip`). Both are copies; the source of record is the Zenodo dataset (https://doi.org/10.5281/zenodo.24141227).
+
+### CORS (cross-origin images)
+
+**What it is:** CORS (Cross-Origin Resource Sharing) decides whether a page from one origin (e.g. `https://eliaskreyenbuehl.github.io`) may *read* data from another origin (e.g. `huggingface.co`). Any page may *show* a foreign image in an `<img>`. But as soon as the app reads pixels (color analysis, palette, difference map, screenshot, auto-align), the browser requires the image host to allow it with the response header `Access-Control-Allow-Origin`. Without it the canvas is "tainted" and `getImageData()` / `toDataURL()` throw a `SecurityError`.
+
+**Status of our hosts** (checked 14.11.2026 with `curl` and in Chrome from a GitHub Pages page):
+
+| Host | Used for | Header | Notes |
+|---|---|---|---|
+| `eliaskreyenbuehl.github.io` (photochrom-images) | thumbnails, `info.json` | `Access-Control-Allow-Origin: *` | GitHub Pages sends it for all files |
+| `www.e-rara.ch/i3f/v21/…` | recatalogued images, `info.json` | `Access-Control-Allow-Origin: *` | `info.json` declares `"cors"` support. The header comes on **GET**; a `curl -I` (HEAD) request for an image showed none, so test with GET |
+| `huggingface.co/datasets/…/resolve/main/…` | legacy 2K scans | `Access-Control-Allow-Origin` on the 302 redirect **and** `*` on the CDN (`*.cdn.hf.co`) | both hops must allow it, and they do. Pixels readable in Chrome (tested: 2000×1455 image, 1.5 s) |
+
+**In code**
+
+- `<img>`: set `img.crossOrigin = 'anonymous'` **before** `img.src`; otherwise the browser loads without CORS and the canvas is tainted even though the host allows it.
+- `fetch(url, { mode: 'cors' })` + `createImageBitmap(blob)` also works and keeps the canvas clean.
+- OpenSeadragon: viewer option `crossOriginPolicy: 'Anonymous'`.
+- Do not send credentials (`crossOrigin = 'use-credentials'`): the hosts answer with `*`, which browsers reject together with credentials.
+- **Every redirect hop must allow CORS**, not only the final response. Hugging Face does this; Wikimedia does not (see below).
+- **Wikimedia Commons (right-hand images of painting pairs):** `https://commons.wikimedia.org/wiki/Special:FilePath/<file>?width=…` **fails** in the browser (`Failed to fetch`): its 302/301 redirects carry no CORS header, only the final image does. The direct URLs work: `https://upload.wikimedia.org/wikipedia/commons/…` (original) and `https://thumb.wikimedia.org/wikipedia/commons/thumb/…/<w>px-…` (scaled), both `Access-Control-Allow-Origin: *`, pixels readable (tested 14.11.2026, 960 px and 4963 px). `commons_image_url` in `data/artwork-pairs.csv` uses `Special:FilePath`, so resolve it first via the Commons API, which itself allows CORS with `origin=*`: `https://commons.wikimedia.org/w/api.php?action=query&titles=File:<file>&prop=imageinfo&iiprop=url&iiurlwidth=1600&format=json&origin=*` → `thumburl` / `url`. Better: resolve once in a build script and store the direct URLs in the CSV.
+- Other new sources (museum sites): check before relying on pixel access; many museum sites send no CORS header. User uploads (`File` / blob URLs) are same-origin and always readable. If a source does not allow CORS, show the image but disable the analysis for it, with a message.
+
+**How to test a host**
+
+```
+curl -s -D - -o /dev/null -L -H "Origin: https://eliaskreyenbuehl.github.io" "<image url>" | grep -i access-control
+```
+
+In the browser console of the app (not of an error page): `const r = await fetch(url, {mode: 'cors'})`; if it throws `Failed to fetch`, check the console for a CORS message.
+
+**Pitfall seen while testing:** on GitHub's own 404 page the same fetch failed, because that page sets a Content Security Policy (CSP) that blocks requests to other hosts. That is a property of the test page, not of the image host. Our app sets no CSP; if one is added later, it must allow `connect-src` and `img-src` for the three hosts above.
+
+**Local development:** pages opened as `file://` have origin `null` and ES modules do not load at all; always serve the folder (`python -m http.server`), see *Run locally*.
 
 ## Print area: scans without color charts
 
