@@ -18,6 +18,7 @@ function rangeRow(name, label, min, max, step, extra = '') {
 }
 
 export function createControls({ onAutoAlign }) {
+  let adjustSide = 'right'; // image whose adjustments the sliders edit
   const root = document.createElement('div');
   root.className = 'cmp-controls';
   root.innerHTML = `
@@ -58,14 +59,20 @@ export function createControls({ onAutoAlign }) {
 
     <details class="cmp-group" open>
       <summary>Adjustments</summary>
-      ${SIDES.map(
-        (side) => `
-        <fieldset class="cmp-adjust" data-side="${side}">
-          <legend></legend>
-          ${ADJUSTMENTS.map((a) => rangeRow(`adj-${side}-${a.id}`, a.label, a.min, a.max, 1)).join('')}
-          <button type="button" class="button" data-action="reset-adjust" data-side="${side}">Reset</button>
-        </fieldset>`
-      ).join('')}
+      <fieldset class="segmented cmp-adjust-target">
+        <legend>Image to edit</legend>
+        ${SIDES.map(
+          (side) => `
+          <label>
+            <input type="radio" name="adjust-side" value="${side}"${side === adjustSide ? ' checked' : ''}>
+            <span><span class="cmp-adjust-label"></span><span class="cmp-edited" hidden><span aria-hidden="true"> •</span><span class="sr-only"> (adjusted)</span></span></span>
+          </label>`
+        ).join('')}
+      </fieldset>
+      <div class="cmp-adjust">
+        ${ADJUSTMENTS.map((a) => rangeRow(`adj-${a.id}`, a.label, a.min, a.max, 1)).join('')}
+        <button type="button" class="button" data-action="reset-adjust">Reset</button>
+      </div>
       <p class="cmp-note">Applies to the display and screenshots. The color analysis below always uses the original pixels.</p>
     </details>
   `;
@@ -92,12 +99,16 @@ export function createControls({ onAutoAlign }) {
   input('sensitivity').addEventListener('input', (e) => update({ diff: { ...store.diff, sensitivity: Number(e.target.value) } }, 'diff'));
   input('heat').addEventListener('input', (e) => update({ diff: { ...store.diff, opacity: e.target.value / 100 } }, 'diff'));
 
-  for (const side of SIDES) {
-    for (const a of ADJUSTMENTS) {
-      input(`adj-${side}-${a.id}`).addEventListener('input', (e) => {
-        update({ adjust: { ...store.adjust, [side]: { ...store.adjust[side], [a.id]: Number(e.target.value) } } }, 'adjust');
-      });
-    }
+  for (const a of ADJUSTMENTS) {
+    input(`adj-${a.id}`).addEventListener('input', (e) => {
+      update({ adjust: { ...store.adjust, [adjustSide]: { ...store.adjust[adjustSide], [a.id]: Number(e.target.value) } } }, 'adjust');
+    });
+  }
+  for (const radio of root.querySelectorAll('input[name="adjust-side"]')) {
+    radio.addEventListener('change', () => {
+      adjustSide = radio.value;
+      syncAdjustments();
+    });
   }
 
   root.addEventListener('click', (e) => {
@@ -105,10 +116,7 @@ export function createControls({ onAutoAlign }) {
     if (action === 'auto-align') onAutoAlign();
     else if (action === 'reset-manual') setManual(defaultManual());
     else if (action === 'reset-fit') resetFit();
-    else if (action === 'reset-adjust') {
-      const side = e.target.dataset.side;
-      update({ adjust: { ...store.adjust, [side]: defaultAdjustments() } }, 'adjust');
-    }
+    else if (action === 'reset-adjust') update({ adjust: { ...store.adjust, [adjustSide]: defaultAdjustments() } }, 'adjust');
   });
 
   function resetFit() {
@@ -156,13 +164,11 @@ export function createControls({ onAutoAlign }) {
   }
 
   function syncAdjustments() {
-    for (const side of SIDES) {
-      for (const a of ADJUSTMENTS) {
-        const v = store.adjust[side][a.id];
-        setValue(`adj-${side}-${a.id}`, v, `${v}${a.unit === '%' ? ' %' : a.unit}`);
-      }
-      root.querySelector(`[data-action="reset-adjust"][data-side="${side}"]`).disabled = isDefault(store.adjust[side]);
-    }
+    const values = store.adjust[adjustSide];
+    for (const a of ADJUSTMENTS) setValue(`adj-${a.id}`, values[a.id], `${values[a.id]}${a.unit === '%' ? ' %' : a.unit}`);
+    $('[data-action="reset-adjust"]').disabled = isDefault(values);
+    // Mark images that have adjustments, also the one not being edited.
+    for (const side of SIDES) root.querySelector(`input[name="adjust-side"][value="${side}"] + span .cmp-edited`).hidden = isDefault(store.adjust[side]);
   }
 
   // Only the controls affected by the change reason are updated (dragging the
@@ -175,7 +181,7 @@ export function createControls({ onAutoAlign }) {
         ...SIDES.map((side) => new Option(`${store.images[side].label} over ${store.images[otherSide(side)].label.toLowerCase()}`, side))
       );
       select.value = store.overlaySide;
-      for (const side of SIDES) root.querySelector(`.cmp-adjust[data-side="${side}"] legend`).textContent = store.images[side].label;
+      for (const side of SIDES) root.querySelector(`input[name="adjust-side"][value="${side}"] + span .cmp-adjust-label`).textContent = store.images[side].label;
     }
     if (reason === 'pair') {
       setAlignStatus('');
