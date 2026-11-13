@@ -1,5 +1,7 @@
 # Sample: two comparison pairs
 
+**For development and testing only.** The app itself will load images via IIIF.
+
 Two photochroms that reproduce paintings, each with an image of the original, for building and
 testing the comparison view. Both pairs come from `data/artwork-pairs.csv` (Wikidata match,
 `match_status = certain`, unreviewed) and are starting cases of the challenge.
@@ -12,7 +14,7 @@ testing the comparison view. Both pairs come from `data/artwork-pairs.csv` (Wiki
 ## Files
 
 - `<sample_id>_photochrom.jpg`: from the e-rara IIIF service, 2000 px long side
-- `<sample_id>_original.jpg`: from Wikimedia Commons
+- `<sample_id>_original.jpg`: from Wikimedia Commons (Gleyre in full resolution, 4963 × 2835 px)
 - `sample-metadata.csv`: one row per pair, 104 columns
   - `photochrom_*`: the full catalogue record from `photochrom-metadata.csv`
   - `pair_*`: the Wikidata match from `artwork-pairs.csv`
