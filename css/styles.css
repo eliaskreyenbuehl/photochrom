@@ -367,15 +367,16 @@ body {
   font-weight: 600;
 }
 
-/* Divider sizes are divided by the zoom so it stays thin and grabbable. */
+/* Slider divider: in the stage (screen space), so it is never zoomed or moved off screen. */
 #panel-comparison .cmp-divider {
   position: absolute;
+  z-index: 1;
   top: 0;
   bottom: 0;
-  width: calc(2px * var(--inv-zoom));
-  margin-left: calc(-1px * var(--inv-zoom));
+  width: 2px;
+  margin-left: -1px;
   background: #fff;
-  box-shadow: 0 0 0 calc(1px * var(--inv-zoom)) rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
   cursor: ew-resize;
 }
 
@@ -386,7 +387,7 @@ body {
   top: 0;
   bottom: 0;
   left: 50%;
-  width: calc(28px * var(--inv-zoom));
+  width: 28px;
   transform: translateX(-50%);
 }
 
@@ -397,7 +398,7 @@ body {
   left: 50%;
   width: 2rem;
   height: 2rem;
-  transform: translate(-50%, -50%) scale(var(--inv-zoom));
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.35);

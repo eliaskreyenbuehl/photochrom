@@ -25,7 +25,7 @@ import { MAX_ZOOM, MIN_ZOOM, clampZoom, createZoom } from './zoom.js';
 const ZOOM_HINT = 'Pinch or Ctrl/⌘ + scroll to zoom, double-click to zoom in (Shift: out), 0 to fit.';
 
 const HINTS = {
-  side: 'Double-click an image (or click its title) to see it in full with all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together.',
+  side: 'Double-click an image (or click its title) to see it in full with all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together; turn it off to adjust one image, then on again to keep that offset.',
   'overlay-move': `Move overlay: drag to move it, Shift + scroll scales, Alt + scroll rotates; with the image focused, arrow keys move, + / − scale, [ / ] rotate (Shift: larger steps). Hold Space or switch to Pan (H) to drag the view. ${ZOOM_HINT}`,
   'overlay-pan': `Pan: drag to move the view, arrow keys pan. Switch to Move overlay (V) to align. ${ZOOM_HINT}`,
   slider: `Drag the divider line (or press ← →) to compare; drag anywhere else to pan. ${ZOOM_HINT}`,
@@ -77,9 +77,9 @@ export function createViewer() {
           <div class="cmp-overlay-clip"></div>
           <canvas class="cmp-diff-layer" data-only="diff"></canvas>
           <div class="cmp-diff-boxes" data-only="diff"></div>
-          <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true"></span></div>
         </div>
       </div>
+      <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true"></span></div>
     </div>
     <p class="cmp-stage-hint" id="cmp-stage-hint"></p>
   `;
@@ -97,8 +97,8 @@ export function createViewer() {
   const linkButton = $('[data-action="link"]');
   const frame = (side) => root.querySelector(`.cmp-figure[data-side="${side}"] .cmp-frame`);
 
-  /** Current stage geometry at zoom 1: padding and scale (CSS px per base natural px). */
-  let geo = { pad: 0, vs: 1, w: 0, h: 0 };
+  /** Current stage geometry at zoom 1: padding, scale (CSS px per base natural px), base size, stage width. */
+  let geo = { pad: 0, vs: 1, w: 0, h: 0, stageW: 0 };
   let tool = 'move'; // overlay view: 'move' | 'pan'
   let spaceHeld = false;
   let linked = true;
@@ -118,18 +118,34 @@ export function createViewer() {
     bindPointer: false, // routed below, so the overlay drag and panning never compete
     allowDblClick: () => !(store.view === 'overlay' && tool === 'move' && !spaceHeld),
     onChange: ({ scale }) => {
-      // Keeps the divider and difference boxes a constant size on screen.
+      // Keeps the difference boxes a constant size on screen.
       inner.style.setProperty('--inv-zoom', String(1 / scale));
       if (store.view !== 'side') showZoom(scale);
+      if (store.view === 'slider') keepDividerOnScreen();
     },
   });
 
-  /** Mirror one side-by-side frame onto the other (relative to the image size). */
-  function mirror(from, { scale, x, y }) {
+  // Linked side-by-side zoom is relative: every change of one frame (zoom factor,
+  // pan relative to the image size) is applied to the other one. Offsets made
+  // while unlinked are therefore kept when linking again.
+  const sideState = Object.fromEntries(SIDES.map((side) => [side, { scale: 1, x: 0, y: 0 }]));
+
+  /** Apply the change of frame `from` (from sideState[from] to `next`) to the other frame. */
+  function follow(from, next) {
+    const to = otherSide(from);
     const a = store.images[from]?.display;
-    const b = store.images[otherSide(from)]?.display;
+    const b = store.images[to]?.display;
     if (!a?.offsetWidth || !b?.offsetWidth) return;
-    sideZooms[otherSide(from)].set(scale, (x * b.offsetWidth) / a.offsetWidth, (y * b.offsetHeight) / a.offsetHeight, { silent: true });
+    const prev = sideState[from];
+    const cur = sideState[to];
+    const zoom = sideZooms[to];
+    zoom.set(
+      (cur.scale * next.scale) / prev.scale,
+      cur.x + ((next.x - prev.x) * b.offsetWidth) / a.offsetWidth,
+      cur.y + ((next.y - prev.y) * b.offsetHeight) / a.offsetHeight,
+      { silent: true }
+    );
+    sideState[to] = { scale: zoom.scale(), ...zoom.pan() };
   }
 
   const sideZooms = Object.fromEntries(
@@ -137,16 +153,26 @@ export function createViewer() {
       side,
       createZoom(frame(side).querySelector('.cmp-zoom'), {
         allowDblClick: () => false, // double-click opens the image dialog instead
-        onChange: (state) => {
+        onChange: ({ scale, x, y }) => {
+          if (linked) follow(side, { scale, x, y });
+          sideState[side] = { scale, x, y };
           lastSide = side;
-          if (linked) mirror(side, state);
-          if (store.view === 'side') showZoom(state.scale);
+          if (store.view === 'side') showZoom(scale);
         },
       }),
     ])
   );
 
-  /** Zoom controllers the toolbar buttons act on. */
+  /** Fit both side-by-side images (silently, so linking does not move them again). */
+  function fitSides() {
+    for (const side of SIDES) {
+      sideZooms[side].reset({ silent: true });
+      sideState[side] = { scale: 1, x: 0, y: 0 };
+    }
+    if (store.view === 'side') showZoom(1);
+  }
+
+  /** Zoom controllers the zoom buttons act on (linked: one frame, the other follows). */
   function toolbarTargets() {
     if (store.view !== 'side') return [stageZoom];
     return linked ? [sideZooms[lastSide]] : SIDES.map((side) => sideZooms[side]);
@@ -154,13 +180,12 @@ export function createViewer() {
 
   function resetZoom() {
     stageZoom.reset();
-    for (const side of SIDES) sideZooms[side].reset();
+    fitSides();
   }
 
   function setLinked(value) {
     linked = value;
     linkButton.setAttribute('aria-pressed', String(linked));
-    if (linked && sideZooms[lastSide].ready()) mirror(lastSide, { scale: sideZooms[lastSide].scale(), ...sideZooms[lastSide].pan() });
   }
 
   function setTool(value) {
@@ -175,7 +200,7 @@ export function createViewer() {
     if (!button) return;
     if (button.dataset.tool) setTool(button.dataset.tool);
     else if (button.dataset.action === 'link') setLinked(!linked);
-    else if (button.dataset.zoom === 'fit') toolbarTargets().forEach((z) => z.reset());
+    else if (button.dataset.zoom === 'fit') store.view === 'side' ? fitSides() : stageZoom.reset();
     else if (button.dataset.zoom === 'in') toolbarTargets().forEach((z) => z.zoomIn());
     else if (button.dataset.zoom === 'out') toolbarTargets().forEach((z) => z.zoomOut());
   });
@@ -190,7 +215,7 @@ export function createViewer() {
     // Padding lets the overlay be dragged beyond the base edges in overlay view.
     const pad = store.view === 'overlay' ? Math.round(Math.min(width, maxH) * 0.06) : 0;
     const vs = Math.min((width - 2 * pad) / base.natW, (maxH - 2 * pad) / base.natH);
-    return { pad, vs, w: base.natW * vs, h: base.natH * vs };
+    return { pad, vs, w: base.natW * vs, h: base.natH * vs, stageW: width };
   }
 
   /** Move the display canvases into the containers of the current view. */
@@ -265,11 +290,41 @@ export function createViewer() {
     oc.style.opacity = store.view === 'overlay' ? String(store.opacity) : '1';
   }
 
+  // The slider divider lives in the stage (screen space), not in the zoomed
+  // image, so it always spans the visible height and stays on screen. While
+  // panning/zooming it keeps its screen position (within the visible part of the
+  // base image) and store.divider – the split as a fraction of the base width –
+  // follows the image moving underneath.
+
+  /** Horizontal extent of the base image in stage px, computed from the zoom state (no layout read). */
+  function baseSpan() {
+    const s = stageZoom.scale();
+    const cx = geo.stageW / 2;
+    const innerLeft = (geo.stageW - geo.w - 2 * geo.pad) / 2;
+    return { left: cx + s * (innerLeft + geo.pad - cx + stageZoom.pan().x), width: geo.w * s };
+  }
+
+  /** Clamp a stage x to the visible part of the base image and return it as base fraction. */
+  function dividerAt(x) {
+    const { left, width } = baseSpan();
+    const visible = Math.min(Math.max(x, left, 0), left + width, geo.stageW);
+    return (visible - left) / width;
+  }
+
+  let dividerX = null; // stage px of the divider line
+
+  function keepDividerOnScreen() {
+    if (dividerX === null) return;
+    const fraction = dividerAt(dividerX);
+    if (Math.abs(fraction - store.divider) > 1e-6) setDivider(fraction);
+  }
+
   function applyDivider() {
-    const dividerX = geo.pad + store.divider * geo.w;
-    overlayClip.style.clipPath = store.view === 'slider' ? `inset(0 0 0 ${dividerX}px)` : 'none';
-    divider.style.left = `${dividerX}px`;
+    overlayClip.style.clipPath = store.view === 'slider' ? `inset(0 0 0 ${geo.pad + store.divider * geo.w}px)` : 'none';
     if (store.view === 'slider') {
+      const { left, width } = baseSpan();
+      dividerX = left + store.divider * width;
+      divider.style.left = `${dividerX}px`;
       stage.setAttribute('aria-label', `Before/after slider: ${baseImage().label} left, ${overlayImage().label} right, divider at ${Math.round(store.divider * 100)}%`);
     }
   }
@@ -314,17 +369,14 @@ export function createViewer() {
   const pointers = new Map(); // pointerId -> latest event
   let gesture = null; // 'pan' | 'move' | 'divider'
   let moveStart = null;
-  let dividerRect = null; // stage-inner rect, fixed during a divider drag
+  let stageLeft = 0; // stage rect left, fixed during a divider drag
 
   const setDivider = (value) => update({ divider: Math.min(1, Math.max(0, value)) }, 'divider');
   const movesOverlay = () => store.view === 'overlay' && tool === 'move' && !spaceHeld;
   /** Screen px per base natural px, including the zoom. */
   const screenScale = () => geo.vs * stageZoom.scale();
 
-  function dividerFromEvent(e, rect = inner.getBoundingClientRect()) {
-    const zoom = rect.width / (geo.w + 2 * geo.pad);
-    setDivider(((e.clientX - rect.left) / zoom - geo.pad) / geo.w);
-  }
+  const dividerFromEvent = (e) => setDivider(dividerAt(e.clientX - stageLeft));
 
   function updateCursor() {
     let cursor = 'grab';
@@ -355,8 +407,8 @@ export function createViewer() {
     } else if (store.view === 'slider') {
       if (e.target.closest('.cmp-divider')) {
         gesture = 'divider';
-        dividerRect = inner.getBoundingClientRect();
-        dividerFromEvent(e, dividerRect);
+        stageLeft = stage.getBoundingClientRect().left;
+        dividerFromEvent(e);
       } else {
         startPan(e);
       }
@@ -371,7 +423,7 @@ export function createViewer() {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, e);
     if (gesture === 'pan') stageZoom.handleMove(e);
-    else if (gesture === 'divider') dividerFromEvent(e, dividerRect);
+    else if (gesture === 'divider') dividerFromEvent(e);
     else if (gesture === 'move') {
       const k = screenScale();
       setManual({ tx: moveStart.tx + (e.clientX - moveStart.x) / k, ty: moveStart.ty + (e.clientY - moveStart.y) / k });
@@ -451,7 +503,8 @@ export function createViewer() {
       setTool('pan');
       handled = true;
     } else if (store.view === 'slider' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-      const step = e.shiftKey ? 0.1 : 0.01;
+      // 1 % (Shift: 10 %) of the visible width, so the step feels the same at any zoom.
+      const step = (e.shiftKey ? 0.1 : 0.01) / stageZoom.scale();
       setDivider(store.divider + (e.key === 'ArrowLeft' ? -step : step));
       handled = true;
     } else if (plain && movesOverlay()) {
@@ -482,6 +535,8 @@ export function createViewer() {
       if (e.key === 'Enter') {
         e.preventDefault(); // otherwise the same key press activates the dialog's focused Close button
         openDialog(side);
+      } else if (e.key === '0' && linked) {
+        fitSides();
       } else if (sideZooms[side].handleKey(e)) e.preventDefault();
     });
     root.querySelector(`.cmp-figure[data-side="${side}"] .cmp-title`).addEventListener('click', () => openDialog(side));

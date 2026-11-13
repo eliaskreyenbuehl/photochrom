@@ -74,8 +74,8 @@ export function createZoom(content, { bindPointer = true, onChange = () => {}, a
     p.pan(x, y, { animate: false, force: true, silent });
   }
 
-  function reset() {
-    ensure().reset({ animate: false });
+  function reset({ silent = false } = {}) {
+    ensure().reset({ animate: false, silent });
   }
 
   const isFit = () => Math.abs(scale() - 1) < 1e-3 && Math.abs(pan().x) < 0.5 && Math.abs(pan().y) < 0.5;
