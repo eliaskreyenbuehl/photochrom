@@ -29,9 +29,16 @@ photochrom/
     └── artwork-pairs.html           first comparison page: photochrom (IIIF) next to the original (Commons), German labels
 ```
 
+## Related work at the hack
+
+- **Photochrom Colours** by Nobu ([NbtKmy](https://github.com/NbtKmy)): colour bands of the photochroms by year,
+  and an overlay of art reproductions on the paintings they copy (drag, rotate, fade, difference blending).
+  Repo: https://github.com/NbtKmy/glamhack2026_photochrom, live: https://nbtkmy.github.io/glamhack2026_photochrom/index.html
+
 ## Data and licences
 
-- Dataset: *Photochrom Collection of the Zentralbibliothek Zürich*, https://doi.org/10.5281/zenodo.23956325
+- Dataset: *Photochrom Collection of the Zentralbibliothek Zürich*, version 1.1, https://doi.org/10.5281/zenodo.24141227
+  (files in `data/zenodo/` are byte-identical to this version)
 - Metadata and derived data: CC0. Photochrom images: Public Domain Mark. Images are not in this
   repo; recatalogued images are available via IIIF (e-rara.ch), all images as ZIPs on Zenodo.
 - Museum images (right side of the comparison) have **varying rights**; check before reuse.

@@ -1,7 +1,7 @@
 # Data
 
 All data in `data/` comes from the dataset **Photochrom Collection of the Zentralbibliothek Zürich**
-(Zenodo, https://doi.org/10.5281/zenodo.23956325). Metadata is CC0, images are Public Domain Mark.
+(Zenodo, version 1.1, https://doi.org/10.5281/zenodo.24141227). Metadata is CC0, images are Public Domain Mark.
 The full dataset description is the README on Zenodo; this page is the short version for the hack.
 
 ## Two groups of records
