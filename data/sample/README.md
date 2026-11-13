@@ -24,7 +24,10 @@ testing the comparison view. Both pairs come from `data/artwork-pairs.csv` (Wiki
 
 - Photochroms: Public Domain Mark, Zentralbibliothek Zürich.
 - `correggio-heilige-nacht_original.jpg`: public domain (Wikimedia Commons). Only 733 × 1000 px;
-  the [SKD online collection](https://skd-online-collection.skd.museum/Details/Index/243576) has a better image.
+  The file is byte-identical to the image in the
+  [SKD online collection](https://skd-online-collection.skd.museum/Details/Index/243576), which offers no
+  higher resolution. Commons marks it as public domain (PD-Art); the SKD label their version
+  “Freier Zugang – Rechte vorbehalten” ([InC](https://rightsstatements.org/page/InC/1.0/)).
 - `gleyre-le-soir_original.jpg`: photograph by **Françoise Foliot, CC BY-SA 4.0**,
   [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Fran%C3%A7oise_Foliot_-_Charles_Gleyre_-_Le_Soir.jpg).
   Attribution and share-alike are required whenever it is shown or passed on.
