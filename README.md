@@ -3,6 +3,10 @@
 GLAMhack26, Winterthur. A digital research environment for the photochrom collection of the
 Zentralbibliothek Zürich (ZB), built for the challenge **Detecting Image Manipulation**.
 
+## Page
+
+[https://eliaskreyenbuehl.github.io/photochrom/#media-library]([url](https://eliaskreyenbuehl.github.io/photochrom/#media-library))
+
 ## About
 
 _(in progress)_
