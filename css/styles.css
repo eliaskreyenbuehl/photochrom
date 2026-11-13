@@ -55,3 +55,208 @@ body {
 .tab-panel { padding: 1.5rem; }
 
 .placeholder { color: var(--muted); }
+
+/* ---------------------------------------------------------------------------
+   Image Comparison tab – color analysis section (js/tabs/comparison/analysis.js) */
+
+#panel-comparison .analysis {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+#panel-comparison .analysis h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+#panel-comparison .analysis h4 { margin: 0; font-size: 1rem; }
+
+#panel-comparison .analysis-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+#panel-comparison .analysis-source { margin: 0; }
+
+#panel-comparison .analysis-thumb {
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ebe8e2;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#panel-comparison .analysis-thumb canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#panel-comparison .analysis-source figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+#panel-comparison .analysis-swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  align-self: center;
+}
+
+#panel-comparison .analysis-credit { color: var(--muted); }
+
+#panel-comparison .analysis-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+}
+
+#panel-comparison .control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#panel-comparison select {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--fg);
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+}
+
+#panel-comparison .segmented {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+#panel-comparison .segmented legend {
+  padding: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#panel-comparison .segmented label { position: relative; }
+
+#panel-comparison .segmented input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+#panel-comparison .segmented span {
+  display: block;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 0.95rem;
+}
+
+#panel-comparison .segmented label + label span { border-left: none; }
+#panel-comparison .segmented label:first-of-type span { border-radius: 4px 0 0 4px; }
+#panel-comparison .segmented label:last-of-type span { border-radius: 0 4px 4px 0; }
+
+#panel-comparison .segmented input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+#panel-comparison .segmented input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#panel-comparison .segmented input:disabled + span {
+  color: var(--muted);
+  background: var(--bg);
+  cursor: not-allowed;
+}
+
+#panel-comparison .analysis-description,
+#panel-comparison .analysis-note {
+  margin: 0.75rem 0 0;
+  max-width: 70ch;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+#panel-comparison .analysis-status {
+  min-height: 1.25rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+#panel-comparison .analysis-status.is-error { color: #b42318; }
+
+#panel-comparison .analysis-plot {
+  min-height: 680px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+#panel-comparison .analysis-palette-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin-top: 2rem;
+}
+
+#panel-comparison .analysis-palettes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+#panel-comparison .palette h5 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+
+#panel-comparison .palette-strip {
+  display: flex;
+  gap: 2px;
+  height: 40px;
+}
+
+#panel-comparison .palette-strip span { min-width: 2px; border-radius: 2px; }
+
+#panel-comparison .palette-swatches {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.4rem 1rem;
+  font-size: 0.85rem;
+}
+
+#panel-comparison .palette-swatches li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#panel-comparison .palette-chip {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+#panel-comparison .palette-share { color: var(--muted); margin-left: auto; }
