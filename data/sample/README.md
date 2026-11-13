@@ -23,7 +23,7 @@ testing the comparison view. Both pairs come from `data/artwork-pairs.csv` (Wiki
 ## Rights
 
 - Photochroms: Public Domain Mark, Zentralbibliothek Zürich.
-- `correggio-heilige-nacht_original.jpg`: public domain (Wikimedia Commons). Only 733 × 1000 px;
+- `correggio-heilige-nacht_original.jpg`: public domain (Wikimedia Commons). Only 733 × 1000 px.
   The file is byte-identical to the image in the
   [SKD online collection](https://skd-online-collection.skd.museum/Details/Index/243576), which offers no
   higher resolution. Commons marks it as public domain (PD-Art); the SKD label their version
