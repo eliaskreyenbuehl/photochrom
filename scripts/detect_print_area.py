@@ -19,7 +19,9 @@ to any resolution of the same scan, plus method and a confidence note.
 
 import argparse
 import csv
-from pathlib import Path
+import zipfile
+from io import BytesIO
+from pathlib import Path, PurePosixPath
 
 import numpy as np
 from PIL import Image
@@ -62,14 +64,17 @@ def cut_chart(h, s, v):
     H, W = s.shape
     top, bottom, left, right = 0, H, 0, W
     rows, cols = chart_lines(h, s, v, 1), chart_lines(h, s, v, 0)
+    # neutral gray lines (Kodak label band "KODAK Color Control Patches", gray background)
+    neutral_rows, neutral_cols = s.mean(axis=1) < 0.08, s.mean(axis=0) < 0.08
 
-    def depth(flags):
-        """Depth of a chart strip seen from index 0: it must start near the edge
+    def depth(flags, neutral):
+        """Depth of a chart strip seen from index 0: it must start in the outer 30 %
         and be contiguous (small gaps allowed). Colorful areas deeper inside the
-        print (blue lakes, gilded interiors) are not taken for a chart."""
+        print (blue lakes, gilded interiors) are not taken for a chart. The neutral
+        label band that often lies between the patches and the print is cut too."""
         n = len(flags)
         runs, start, end, count, gap = [], None, 0, 0, 0
-        for i in range(int(n * 0.35)):
+        for i in range(int(n * 0.45)):
             if flags[i]:
                 if start is None:
                     start, count = i, 0
@@ -81,16 +86,19 @@ def cut_chart(h, s, v):
                     start = None
         if start is not None:
             runs.append((start, end, count))
-        # outermost block of chart lines that starts in the outer 20 %
+        # outermost block of chart lines that starts in the outer 30 %
         for s0, e0, c0 in runs:
-            if c0 >= 3 and s0 < n * 0.2:
+            if c0 >= 3 and s0 < n * 0.3:
+                limit = min(n, e0 + int((e0 - s0) * 1.5))
+                while e0 < limit and neutral[e0]:
+                    e0 += 1
                 return e0
         return 0
 
-    top = depth(rows)
-    bottom = H - depth(rows[::-1])
-    left = depth(cols)
-    right = W - depth(cols[::-1])
+    top = depth(rows, neutral_rows)
+    bottom = H - depth(rows[::-1], neutral_rows[::-1])
+    left = depth(cols, neutral_cols)
+    right = W - depth(cols[::-1], neutral_cols[::-1])
     return top, bottom, left, right
 
 
@@ -141,6 +149,45 @@ def outer_trim(flags, edge=0.3, min_gap=3):
     return a, b
 
 
+def expand_to_edges(sub, rows, cols, y0, y1, x0, x1, strength=0.06, share=0.5, bg_share=0.2):
+    """Edge refinement: dark or light parts of the print can look like background,
+    so the box may stop inside the print. The paper edge of the print is a long
+    straight edge. Each side is moved outwards to the outermost line with a
+    continuous strong edge, if everything beyond it looks like background."""
+    g = sub.mean(axis=2)
+    Hs, Ws = g.shape
+    # edge share per row (between row y-1 and y) within the current column range, and per column
+    dy = np.abs(np.diff(g[:, x0:x1], axis=0)) > strength      # shape (Hs-1, w)
+    dx = np.abs(np.diff(g[y0:y1, :], axis=1)) > strength      # shape (h, Ws-1)
+    row_edge = dy.mean(axis=1) > share                          # edge between y and y+1 at index y
+    col_edge = dx.mean(axis=0) > share
+    bg_rows, bg_cols = ~rows, ~cols
+
+    row_tex = g.std(axis=1)    # texture per row / column: print content varies, background does not
+    col_tex = g.std(axis=0)
+
+    def textured(tex, a, b):
+        return b > a and tex[a:b].mean() > 0.04
+
+    for y in range(2, y0):
+        if row_edge[y] and bg_rows[:y + 1].mean() >= 1 - bg_share and textured(row_tex, y + 1, y0):
+            y0 = y + 1
+            break
+    for y in range(Hs - 3, y1 - 1, -1):
+        if row_edge[y] and bg_rows[y + 1:].mean() >= 1 - bg_share and textured(row_tex, y1, y + 1):
+            y1 = y + 1
+            break
+    for x in range(2, x0):
+        if col_edge[x] and bg_cols[:x + 1].mean() >= 1 - bg_share and textured(col_tex, x + 1, x0):
+            x0 = x + 1
+            break
+    for x in range(Ws - 3, x1 - 1, -1):
+        if col_edge[x] and bg_cols[x + 1:].mean() >= 1 - bg_share and textured(col_tex, x1, x + 1):
+            x1 = x + 1
+            break
+    return y0, y1, x0, x1
+
+
 def print_box(img):
     a = np.asarray(img.convert("RGB"), dtype=np.float32) / 255
     H, W = a.shape[:2]
@@ -159,6 +206,7 @@ def print_box(img):
     cols = content.mean(axis=0) > 0.35
     y0, y1 = outer_trim(rows)
     x0, x1 = outer_trim(cols)
+    y0, y1, x0, x1 = expand_to_edges(sub, rows, cols, y0, y1, x0, x1)
     box = (l + x0, t + y0, l + x1, t + y1)
     area = (box[2] - box[0]) * (box[3] - box[1]) / (W * H)
     note = "chart" if chart else "no chart"
@@ -172,9 +220,33 @@ def print_box(img):
     return [round(box[0] / W, 4), round(box[1] / H, 4), round(box[2] / W, 4), round(box[3] / H, 4)], note
 
 
+def load_thumb(args, ident):
+    """300 px thumbnail as used for tuning: from the thumbnail folder, or made from a preview ZIP
+    exactly like build_thumbs_iiif.py does (LANCZOS to 300 px width, JPEG quality 80)."""
+    if args.images:
+        p = args.images / "iiif" / ident / "full" / "300," / "0" / "default.jpg"
+        return Image.open(p).convert("RGB") if p.exists() else None
+    hit = args.members.get(ident)
+    if hit is None:
+        return None
+    z, name = hit
+    with Image.open(BytesIO(z.read(name))) as im:
+        im = im.convert("RGB")
+        w = min(300, im.width)
+        small = im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
+    buf = BytesIO()
+    small.save(buf, "JPEG", quality=80, optimize=True, progressive=True)
+    buf.seek(0)
+    return Image.open(buf).convert("RGB")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--images", required=True, type=Path)
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--images", type=Path, help="thumbnail folder: <images>/iiif/<id>/full/300,/0/default.jpg")
+    src.add_argument("--zip", type=Path, nargs="+",
+                     help="preview ZIPs from Zenodo (images-*-preview.zip); images are reduced to the "
+                          "300 px thumbnails used for tuning (same steps as build_thumbs_iiif.py)")
     ap.add_argument("--ids-from", required=True, type=Path, help="CSV with image_filename and scan_farbkarte")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--all", action="store_true", help="all images, not only those with scan_farbkarte = ja")
@@ -191,17 +263,25 @@ def main():
     if args.limit:
         ids = ids[: args.limit]
 
+    if args.zip:
+        args.members = {}
+        for zp in args.zip:
+            z = zipfile.ZipFile(zp)
+            for name in z.namelist():
+                if name.lower().endswith(".jpg"):
+                    args.members[PurePosixPath(name).stem] = (z, name)
+    missing = 0
     with open(args.out, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["img", "x0", "y0", "x1", "y1", "note", "method", "review_status"])
         for ident in ids:
-            p = args.images / "iiif" / ident / "full" / "300," / "0" / "default.jpg"
-            if not p.exists():
+            im = load_thumb(args, ident)
+            if im is None:
+                missing += 1
                 continue
-            with Image.open(p) as im:
-                box, note = print_box(im)
+            box, note = print_box(im)
             w.writerow([ident, *box, note, METHOD, "machine-generated, unreviewed"])
-    print(f"{len(ids)} images -> {args.out}")
+    print(f"{len(ids) - missing} images -> {args.out} ({missing} not found)")
 
 
 if __name__ == "__main__":

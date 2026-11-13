@@ -27,7 +27,11 @@ or `images-legacy-2k.zip`). The images are not in this repo.
 | `data/zenodo/photochrom-main-place.csv` | 4,224 | `identifier_swisscollections` | main motif per legacy record (partial) |
 | `data/zenodo/embeddings-siglip2/embeddings.npy` | 9,582 × 1152, float32 | row number | SigLIP 2 image vectors for similarity and free-text search |
 | `data/zenodo/embeddings-siglip2/dateien.csv` | 9,582 | `zeile` (= row), `image_filename` | maps each vector row to an image |
+| `data/print-area.csv` | 4,873 | `img` | **derived**: box of the print without color chart, as fractions `x0,y0,x1,y1` of width/height, for every image with `scan_farbkarte = ja`. `scripts/detect_print_area.py`, method `detect_print_area-v1`, 14.11.2026, machine-generated, unreviewed. About 82–89 % fit well (two samples of 100). `note`: `chart` (4,615), `no chart` (217: chart flag set, but no chart found), `chart; fallback chart cut only, check` (41). 10 rows belong to images outside `catalog.json` (6 excluded records after 1914, 4 further pages of multi-image records) |
+| `data/embeddings-siglip2-printarea/embeddings.npy` | 9,591 × 1152, float32, L2-normalized | row number | **derived**: SigLIP 2 image vectors **of the print area** (crop from `print-area.csv` applied to the 800 px preview; images without box uncropped). Use these for image similarity. Model `google/siglip2-so400m-patch14-384`, revision `e8e487298228002f3d8a82e0cd5c8ea9c567f57f`, fp16, computed on the Mac 14.11.2026 (797 s, 5.3 Wh). Covers all 9,591 images of the preview ZIPs (9 more than the Zenodo embeddings) |
+| `data/embeddings-siglip2-printarea/dateien.csv` | 9,591 | `zeile` (= row), `image_filename` | maps each vector row to an image (legacy, then recatalogued, each by file name) |
 | `data/catalog.json` | 9,604 | `id` (MMS ID) | **derived**: compact join of the files above for the web app, built by `scripts/build_catalog.py`; field list and provenance in its `fields` block. Records starting after 1914 are excluded (6, listed in its `excluded` block): photochrom production ended 1914 |
+| `data/commons-images.csv` | 167 | `commons_file` (= `commons_file` in artwork-pairs.csv) | **derived**: direct, CORS-enabled image URLs for the Commons images of the painting pairs (`original_url`, `thumb_url` about 1,920 px or the original if smaller, with real sizes), plus `license`, `artist`, `credit`, `attribution_required`. `scripts/resolve_commons_urls.py`, Commons API `imageinfo`, 14.11.2026. 158 public domain, 9 under CC licenses (8 need attribution) |
 | `data/artwork-pairs.csv` | 240 | `mms_id` | **photochroms that reproduce paintings, matched to the original artwork** (see below) |
 
 ## Links between files
@@ -85,6 +89,10 @@ in the thumbnails folder).
 - **Wikimedia Commons has no IIIF.** `commons_image_url` uses `Special:FilePath`, which can be
   resized with `?width=`. For a IIIF viewer on the right side, check each museum for its own IIIF
   service, or wrap the Commons image as a simple image source.
+- **`Special:FilePath` breaks pixel access (CORS).** Its redirects send no CORS header, so the
+  browser refuses canvas work on these URLs. Resolve them to `upload.wikimedia.org` /
+  `thumb.wikimedia.org` URLs first: done in `data/commons-images.csv` (join on `commons_file`);
+  details in `Outline.md`, section *CORS (cross-origin images)*.
 - **Rights of museum images vary.** Photochroms are public domain; museum photographs may not be.
 - Place points for countries and regions are centroids, not camera positions.
 - 2,438 records are dated only `1891/1914`.

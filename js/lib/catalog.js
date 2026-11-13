@@ -62,6 +62,33 @@ export function largeImageUrl(rec, width = 600) {
   return imageUrl(rec, width);
 }
 
+// Full-size legacy scans (2K JPEG, about 2,000 px wide, median 620 KB), hosted on Hugging Face
+// because GitHub Pages is limited to 1 GB. Uploaded by scripts/upload_legacy_2k_hf.py.
+// Served with CORS (Access-Control-Allow-Origin: *) after a 302 redirect to the HF CDN.
+export const LEGACY_FULL_BASE = 'https://huggingface.co/datasets/eliaskre/photochrom-legacy-2k/resolve/main/images';
+
+/**
+ * Full image for zooming, comparison and color analysis.
+ * Recatalogued: e-rara IIIF (level 2), scaled to fit `maxSize` (null = full 4K scan).
+ * Legacy: the whole 2K JPEG (no other sizes exist). Load with crossOrigin = 'anonymous'.
+ */
+export function fullImageUrl(rec, maxSize = 2000) {
+  if (rec.iiif) return `${rec.iiif}/full/${maxSize ? `!${maxSize},${maxSize}` : 'full'}/0/default.jpg`;
+  if (rec.img) return `${LEGACY_FULL_BASE}/${rec.img}.jpg`;
+  return '';
+}
+
+/**
+ * OpenSeadragon tile source for deep zoom.
+ * Recatalogued: IIIF info.json on e-rara (real tiles). Legacy: one simple image, zoom in the browser.
+ * Use the viewer option crossOriginPolicy: 'Anonymous' so pixels stay readable.
+ */
+export function zoomSource(rec) {
+  if (rec.iiif) return `${rec.iiif}/info.json`;
+  if (rec.img) return { type: 'image', url: `${LEGACY_FULL_BASE}/${rec.img}.jpg` };
+  return null;
+}
+
 export const recordUrl = (rec) => `https://swisscollections.ch/Record/${rec.id}`;
 export const doiUrl = (rec) => (rec.doi ? `https://doi.org/${rec.doi}` : '');
 
