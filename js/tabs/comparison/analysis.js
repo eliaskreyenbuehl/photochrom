@@ -20,7 +20,7 @@ const state = {
   source: 'both', // 'left' | 'right' | 'both'
   plotType: PLOT_TYPES[0].id,
   sampleSize: 5000,
-  paletteSize: 8,
+  paletteSize: 6,
 };
 
 let sources = null; // { id, left: { label, img }, right: { label, img } }
