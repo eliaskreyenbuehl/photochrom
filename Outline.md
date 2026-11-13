@@ -1,12 +1,11 @@
 # Outline - Photochrom Comparison Tool
 
-Goal of this project: Goal: Creating a research environment for arthistory.
-From close reading images to distant reading, crafting research questions, finding answers by tagging and comparing subsets
-Image inspection in the smallest detail, revealing the secrets of their fabrication
-Color analysis and comparison of two images
-Comparison of image pairs
+Goal of this project: creating a research environment for art history.
 
-
+- From close reading images to distant reading: crafting research questions, finding answers by tagging and comparing subsets
+- Image inspection in the smallest detail, revealing the secrets of their fabrication
+- Color analysis and comparison of two images
+- Comparison of image pairs
 
 ## Project setup
 
