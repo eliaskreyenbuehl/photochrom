@@ -6,7 +6,7 @@ import comparisonTab from './tabs/comparison.js';
 import mediaLibraryTab from './tabs/media-library.js';
 import pairMatchingTab from './tabs/pair-matching.js';
 
-const TABS = [comparisonTab, mediaLibraryTab, pairMatchingTab];
+const TABS = [mediaLibraryTab, pairMatchingTab, comparisonTab];
 
 function init() {
   const tabBar = document.querySelector('.tab-bar');

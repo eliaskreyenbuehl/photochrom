@@ -1,5 +1,9 @@
 # Outline - Photochrom Comparison Tool
 
+## Project setup
+
+Each feature is implemented in a separate feature branch. The main branch is always deployable and contains the latest stable version.
+
 ## Architecture
 
 The project is hosted on Github and therefore can only use static HTML. If things cannot be built due to this constraint, don't implement it and tell me about the problem.
