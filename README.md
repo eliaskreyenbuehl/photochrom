@@ -5,7 +5,7 @@ Zentralbibliothek Zürich (ZB), built for the challenge **Detecting Image Manipu
 
 ## Page
 
-[https://eliaskreyenbuehl.github.io/photochrom/#media-library]([url](https://eliaskreyenbuehl.github.io/photochrom/#media-library))
+[https://eliaskreyenbuehl.github.io/photochrom/#media-library](https://eliaskreyenbuehl.github.io/photochrom/#media-library)
 
 ## About
 
