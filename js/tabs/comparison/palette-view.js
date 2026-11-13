@@ -8,6 +8,23 @@ import { assignPixels, extractPalette } from './palette.js';
 
 const SWATCH = 120; // px per color in the copied palette image
 
+const COPY_ICON =
+  '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"/></svg>';
+const CHECK_ICON =
+  '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5 6.5 12 13 4.5"/></svg>';
+
+/** Relative luminance (WCAG) of an sRGB color. */
+function luminance([r, g, b]) {
+  const lin = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/** White or near-black text, whichever contrasts more with the color. */
+function textColorOn(rgb) {
+  const l = luminance(rgb);
+  return (1.05 / (l + 0.05) >= (l + 0.05) / (luminance([31, 31, 31]) + 0.05)) ? '#ffffff' : '#1f1f1f';
+}
+
 /** Draw the image; with a selection, other pixels are shown as muted gray. */
 function renderPreview(canvas, image, assign, selected) {
   const ctx = canvas.getContext('2d');
@@ -84,28 +101,35 @@ function paletteBlock(entry, k) {
   actions.append(button('Copy hex', 'copy-hex'), button('Copy image', 'copy-image'));
   head.append(title, actions);
 
-  const strip = document.createElement('div');
-  strip.className = 'palette-strip';
-  strip.setAttribute('aria-hidden', 'true');
-  for (const c of palette) {
-    const seg = document.createElement('span');
-    seg.style.background = c.hex;
-    seg.style.flexGrow = String(c.share);
-    strip.append(seg);
-  }
-
-  const list = document.createElement('ol');
-  list.className = 'palette-swatches';
-  list.setAttribute('aria-label', `${label} palette – select a color to highlight it in the image`);
+  // Proportional color bar; each block shows its hex value and share, has a copy
+  // button for the hex value and highlights the color in the image when clicked.
+  const bar = document.createElement('ol');
+  bar.className = 'palette-bar';
+  bar.setAttribute('aria-label', `${label} palette – select a color to highlight it in the image`);
   palette.forEach((c, i) => {
-    const item = document.createElement('li');
+    const share = `${(c.share * 100).toFixed(1)} %`;
+    const seg = document.createElement('li');
+    seg.className = 'palette-seg';
+    Object.assign(seg.style, { flexGrow: String(c.share), background: c.hex, color: textColorOn(c.rgb) });
+    seg.title = `${c.hex} · ${share}`;
+
     const swatch = button('', 'select');
     swatch.className = 'palette-swatch';
     swatch.dataset.index = String(i);
     swatch.setAttribute('aria-pressed', 'false');
-    swatch.innerHTML = `<span class="palette-chip" style="background:${c.hex}"></span><code>${c.hex}</code><span class="palette-share">${(c.share * 100).toFixed(1)} %</span>`;
-    item.append(swatch);
-    list.append(item);
+    swatch.setAttribute('aria-label', `Highlight ${c.hex} (${share})`);
+
+    const copy = button('', 'copy-one');
+    copy.className = 'palette-copy';
+    copy.dataset.index = String(i);
+    copy.setAttribute('aria-label', `Copy ${c.hex}`);
+    copy.innerHTML = COPY_ICON;
+
+    const hexRow = document.createElement('span');
+    hexRow.className = 'palette-hex';
+    hexRow.append(Object.assign(document.createElement('code'), { textContent: c.hex }), copy);
+    seg.append(swatch, hexRow, Object.assign(document.createElement('span'), { className: 'palette-share', textContent: share }));
+    bar.append(seg);
   });
 
   const preview = document.createElement('canvas');
@@ -125,7 +149,7 @@ function paletteBlock(entry, k) {
     selected = selected === i ? -1 : i;
     assign ??= assignPixels(image, palette);
     const share = renderPreview(preview, image, assign, selected);
-    list.querySelectorAll('.palette-swatch').forEach((el) => el.setAttribute('aria-pressed', String(Number(el.dataset.index) === selected)));
+    bar.querySelectorAll('.palette-swatch').forEach((el) => el.setAttribute('aria-pressed', String(Number(el.dataset.index) === selected)));
     preview.setAttribute('aria-label', selected < 0 ? label : `${label}, pixels closest to ${palette[selected].hex} highlighted`);
     say(selected < 0 ? '' : `Highlighted ${palette[selected].hex}: ${(share * 100).toFixed(1)} % of the pixels.`);
   }
@@ -138,6 +162,18 @@ function paletteBlock(entry, k) {
       say(`Copied ${palette.length} hex values.`);
     } catch {
       say(`Clipboard not available. Hex values: ${palette.map((c) => c.hex).join(', ')}`);
+    }
+  }
+
+  async function copyOne(copyButton) {
+    const { hex } = palette[Number(copyButton.dataset.index)];
+    try {
+      await navigator.clipboard.writeText(hex);
+      say(`Copied ${hex}.`);
+      copyButton.innerHTML = CHECK_ICON;
+      setTimeout(() => (copyButton.innerHTML = COPY_ICON), 1200);
+    } catch {
+      say(`Clipboard not available: ${hex}`);
     }
   }
 
@@ -158,12 +194,13 @@ function paletteBlock(entry, k) {
     const target = e.target.closest('[data-action]');
     if (!target) return;
     if (target.dataset.action === 'select') select(Number(target.dataset.index));
+    else if (target.dataset.action === 'copy-one') copyOne(target);
     else if (target.dataset.action === 'copy-hex') copyHex();
     else if (target.dataset.action === 'copy-image') copyImage();
   });
 
   preview.setAttribute('aria-label', label);
-  block.append(head, strip, list, preview, feedback);
+  block.append(head, bar, preview, feedback);
   return block;
 }
 
