@@ -3,6 +3,10 @@
 GLAMhack26, Winterthur. A digital research environment for the photochrom collection of the
 Zentralbibliothek Zürich (ZB), built for the challenge **Detecting Image Manipulation**.
 
+## Page
+
+[https://eliaskreyenbuehl.github.io/photochrom/#media-library](https://eliaskreyenbuehl.github.io/photochrom/#media-library)
+
 ## About
 
 _(in progress)_
@@ -12,7 +16,18 @@ _(in progress)_
 ```
 photochrom/
 ├── README.md
+├── Outline.md                       concept, requirements and how-tos for contributors (start here to develop)
 ├── LICENSE                          MIT, for the code
+├── index.html                       the web app: page shell with tab bar (static site, GitHub Pages)
+├── css/
+│   └── styles.css                   global styles and CSS variables
+├── js/
+│   ├── main.js                      registers the tabs, handles tab switching
+│   ├── config.js                    default image URLs for the comparison tab
+│   └── tabs/
+│       ├── media-library.js         Media Library tab
+│       ├── pair-matching.js         Pair Matching tab
+│       └── comparison.js            Image Comparison tab
 ├── data/
 │   ├── artwork-pairs.csv            240 photochroms reproducing paintings, matched to the originals (Wikidata, Commons)
 │   ├── sample/                      2 comparison pairs as JPEG + sample-metadata.csv (full metadata, image rights)
@@ -24,9 +39,13 @@ photochrom/
 │       └── embeddings-siglip2/          SigLIP 2 image vectors (embeddings.npy, dateien.csv)
 ├── docs/
 │   ├── data.md                      the data in short: groups, files, keys, traps
-│   └── background.md                how photochroms were made, why they differ from the originals
-└── prototypes/
-    └── artwork-pairs.html           first comparison page: photochrom (IIIF) next to the original (Commons), German labels
+│   ├── background.md                how photochroms were made, why they differ from the originals
+│   └── notes-for-devs.md            image hosts and CORS, colour charts on scans, related work
+├── prototypes/
+│   └── artwork-pairs.html           first comparison page: photochrom (IIIF) next to the original (Commons), German labels
+├── .nojekyll                        disables Jekyll on GitHub Pages
+├── .gitattributes                   keeps files in data/ byte-identical to Zenodo
+└── .gitignore                       images are not in the repo, except data/sample/
 ```
 
 ## Related work at the hack
