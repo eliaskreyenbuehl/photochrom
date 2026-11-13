@@ -1,0 +1,2 @@
+# data files stay byte-identical to the Zenodo release
+data/** -text

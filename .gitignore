@@ -1,0 +1,13 @@
+# images are not part of this repo (download them from Zenodo)
+data/images/
+*.jpg
+*.jpeg
+*.tif
+*.zip
+.env
+.env.*
+__pycache__/
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db
