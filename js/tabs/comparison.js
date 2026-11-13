@@ -1,7 +1,7 @@
 // Image Comparison tab
 // Pair selection, side-by-side / overlay / slider / difference views, per-image
-// adjustments, auto-alignment, overlap (crop) detection, screenshots, metadata
-// and color analysis. Sub-modules live in js/tabs/comparison/.
+// adjustments, auto-alignment, overlap (crop) detection, screenshots, image dialog
+// with metadata, and color analysis. Sub-modules live in js/tabs/comparison/.
 
 import { DEFAULT_PAIR_ID } from '../config.js';
 import { getComparisonPair, onComparisonPairChange, setComparisonPair } from '../state.js';
@@ -10,7 +10,6 @@ import { autoAlign } from './comparison/align.js';
 import { createControls } from './comparison/controls.js';
 import { createDiffView } from './comparison/diffview.js';
 import { loadDisplayImage } from './comparison/media.js';
-import { createMetadataPanel } from './comparison/metadata.js';
 import { loadSamplePairs } from './comparison/pairs.js';
 import { saveScreenshot } from './comparison/screenshot.js';
 import { SIDES, VIEW_LABELS, baseImage, defaultManual, initialPairState, overlayImage, store, subscribe, update } from './comparison/store.js';
@@ -20,7 +19,6 @@ let els = null;
 let controls = null;
 let diffView = null;
 let viewer = null;
-let metadata = null;
 let pairs = [];
 let started = false;
 let loadToken = 0;
@@ -55,7 +53,6 @@ async function loadPair(pair) {
     if (token !== loadToken) return;
     update({ pair, ...initialPairState({ left, right }) }, 'pair');
     els.main.hidden = false;
-    metadata.update(pair);
     analysis.setSources({ id: pair.id, left: { label: left.label, img: left.img }, right: { label: right.label, img: right.img } });
     setStatus('');
   } catch (err) {
@@ -172,8 +169,6 @@ export default {
     container.querySelector('.cmp-main').append(viewer.element);
     container.querySelector('.cmp-sidebar').append(controls.element);
 
-    metadata = createMetadataPanel();
-    container.append(metadata.element);
     analysis.render(container);
 
     els.pairSelect.addEventListener('change', (e) => setComparisonPair(pairs.find((p) => p.id === e.target.value)));

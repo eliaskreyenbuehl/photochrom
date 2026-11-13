@@ -1,5 +1,5 @@
-// Metadata panel: key fields of both images plus a disclosure with every column.
-// Values come from the pair's `fields` (columns of sample-metadata.csv).
+// Metadata of one image (shown in the image dialog): key fields plus a disclosure
+// with every column. Values come from the pair's `fields` (columns of sample-metadata.csv).
 
 import { doiUrl, isUrl, rightsLabel } from './pairs.js';
 
@@ -91,12 +91,13 @@ function definitionList(entries, className) {
   return dl;
 }
 
-function imageColumn(image) {
-  const col = document.createElement('div');
-  col.className = 'meta-column';
-
-  const title = document.createElement('h4');
-  title.textContent = image.label;
+/**
+ * Metadata of one image: curated key fields plus a disclosure with every column.
+ * @param image  one side of a pair ({ role, fields })
+ */
+export function metadataSection(image) {
+  const section = document.createElement('div');
+  section.className = 'cmp-meta';
 
   const fields = image.fields ?? {};
   const keyEntries = (KEY_FIELDS[image.role] ?? []).map(([label, get]) => [label, get(fields)]);
@@ -104,30 +105,15 @@ function imageColumn(image) {
     .filter(([, v]) => v !== '')
     .map(([key, v]) => [key, v.includes('###') ? list(v) : v]);
 
-  const details = document.createElement('details');
-  const summary = document.createElement('summary');
-  summary.textContent = `All fields (${allEntries.length})`;
-  details.append(summary, definitionList(allEntries, 'meta-all'));
+  if (keyEntries.some(([, v]) => !isEmpty(v))) section.append(definitionList(keyEntries, 'meta-key'));
+  else section.append(Object.assign(document.createElement('p'), { className: 'placeholder', textContent: 'No metadata available.' }));
 
-  col.append(title);
-  if (keyEntries.some(([, v]) => !isEmpty(v))) col.append(definitionList(keyEntries, 'meta-key'));
-  else col.append(Object.assign(document.createElement('p'), { className: 'placeholder', textContent: 'No metadata available.' }));
-  if (allEntries.length) col.append(details);
-  return col;
-}
-
-/** Create the (empty) metadata section; call update(pair) to fill it. */
-export function createMetadataPanel() {
-  const section = document.createElement('section');
-  section.className = 'cmp-metadata';
-  section.setAttribute('aria-labelledby', 'cmp-metadata-heading');
-  section.innerHTML = '<h3 id="cmp-metadata-heading">Metadata</h3><div class="meta-columns"></div>';
-  const columns = section.querySelector('.meta-columns');
-
-  return {
-    element: section,
-    update(pair) {
-      columns.replaceChildren(imageColumn(pair.left), imageColumn(pair.right));
-    },
-  };
+  if (allEntries.length) {
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = `All fields (${allEntries.length})`;
+    details.append(summary, definitionList(allEntries, 'meta-all'));
+    section.append(details);
+  }
+  return section;
 }

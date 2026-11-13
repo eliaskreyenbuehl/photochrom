@@ -33,6 +33,8 @@ function pairFromRow(row) {
     left: {
       role: 'original',
       label: 'Original',
+      title: row.pair_work_label || row.pair_note_work_title,
+      year: row.pair_work_year,
       url: SAMPLE_IMAGE_DIR + row.original_file,
       credit: originalCredit(row),
       creditUrl: row.original_commons_page,
@@ -41,6 +43,8 @@ function pairFromRow(row) {
     right: {
       role: 'photochrom',
       label: 'Photochrom',
+      title: row.photochrom_title,
+      year: row.photochrom_date_of_publication_or_production,
       url: SAMPLE_IMAGE_DIR + row.photochrom_file,
       credit: photochromCredit(row),
       creditUrl: doiUrl(row.photochrom_digital_object_identifier),

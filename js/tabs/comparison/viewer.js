@@ -16,6 +16,7 @@
 // the overlay.
 
 import { filterString } from './adjustments.js';
+import { createImageDialog } from './image-dialog.js';
 import { multiply, scaling, toCssMatrix3d, translation } from './geometry.js';
 import { DIFF_BASE_FILTER } from './difference.js';
 import { SIDES, baseImage, otherSide, overlayImage, overlayMatrix, setManual, store, subscribe, update } from './store.js';
@@ -24,7 +25,7 @@ import { MAX_ZOOM, MIN_ZOOM, clampZoom, createZoom } from './zoom.js';
 const ZOOM_HINT = 'Pinch or Ctrl/⌘ + scroll to zoom, double-click to zoom in (Shift: out), 0 to fit.';
 
 const HINTS = {
-  side: `${ZOOM_HINT} Drag to pan. With "Link" on, both images zoom and pan together.`,
+  side: 'Double-click an image (or click its title) to see it in full with all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together.',
   'overlay-move': `Move overlay: drag to move it, Shift + scroll scales, Alt + scroll rotates; with the image focused, arrow keys move, + / − scale, [ / ] rotate (Shift: larger steps). Hold Space or switch to Pan (H) to drag the view. ${ZOOM_HINT}`,
   'overlay-pan': `Pan: drag to move the view, arrow keys pan. Switch to Move overlay (V) to align. ${ZOOM_HINT}`,
   slider: `Drag the divider line (or press ← →) to compare; drag anywhere else to pan. ${ZOOM_HINT}`,
@@ -65,7 +66,7 @@ export function createViewer() {
         (side) => `
         <figure class="cmp-figure" data-side="${side}">
           <div class="cmp-frame" tabindex="0"><div class="cmp-zoom"></div></div>
-          <figcaption><strong></strong> <a class="cmp-credit" target="_blank" rel="noopener"></a></figcaption>
+          <figcaption><button type="button" class="cmp-title" aria-haspopup="dialog" title="Show the full image and its metadata"></button> <span class="cmp-year"></span></figcaption>
         </figure>`
       ).join('')}
     </div>
@@ -135,6 +136,7 @@ export function createViewer() {
     SIDES.map((side) => [
       side,
       createZoom(frame(side).querySelector('.cmp-zoom'), {
+        allowDblClick: () => false, // double-click opens the image dialog instead
         onChange: (state) => {
           lastSide = side;
           if (linked) mirror(side, state);
@@ -215,13 +217,9 @@ export function createViewer() {
     for (const side of SIDES) {
       const image = store.images[side];
       const fig = root.querySelector(`.cmp-figure[data-side="${side}"]`);
-      fig.querySelector('strong').textContent = image?.label ?? '';
-      const credit = fig.querySelector('.cmp-credit');
-      credit.textContent = image?.credit ?? '';
-      if (image?.creditUrl) credit.href = image.creditUrl;
-      else credit.removeAttribute('href');
-      fig.querySelector('.cmp-canvas')?.setAttribute('aria-label', `${image?.label}: ${image?.credit}`);
-      frame(side).setAttribute('aria-label', `${image?.label ?? ''} – zoomable image`);
+      fig.querySelector('.cmp-title').textContent = image.title || image.label;
+      fig.querySelector('.cmp-year').textContent = image.year ?? '';
+      frame(side).setAttribute('aria-label', `${image.label}: ${image.title ?? ''}. Zoomable; press Enter for the full image and metadata.`);
     }
   }
 
@@ -471,13 +469,22 @@ export function createViewer() {
   stage.addEventListener('keyup', (e) => e.key === ' ' && releaseSpace());
   stage.addEventListener('blur', releaseSpace);
 
-  // Side-by-side frames: Panzoom handles the pointer itself; add keyboard zoom.
+  // Side-by-side frames: Panzoom handles the pointer itself; add keyboard zoom and
+  // the image dialog (double-click, Enter, or the title button).
+  const imageDialog = createImageDialog();
+  root.append(imageDialog.element);
+  const openDialog = (side) => store.images[side] && imageDialog.open(store.images[side]);
   for (const side of SIDES) {
     const el = frame(side);
     el.addEventListener('pointerdown', () => el.focus({ preventScroll: true }));
+    el.addEventListener('dblclick', () => openDialog(side));
     el.addEventListener('keydown', (e) => {
-      if (sideZooms[side].handleKey(e)) e.preventDefault();
+      if (e.key === 'Enter') {
+        e.preventDefault(); // otherwise the same key press activates the dialog's focused Close button
+        openDialog(side);
+      } else if (sideZooms[side].handleKey(e)) e.preventDefault();
     });
+    root.querySelector(`.cmp-figure[data-side="${side}"] .cmp-title`).addEventListener('click', () => openDialog(side));
   }
 
   // Layout inputs: the viewer width and the window height. (Observing the viewer's

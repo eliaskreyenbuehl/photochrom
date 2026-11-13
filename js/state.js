@@ -11,9 +11,11 @@
 //   {
 //     id: 'gleyre-le-soir',          // unique id, used in screenshot file names
 //     label: 'Gleyre – Le Soir',     // shown in the pair selector
-//     left:  { role, label, url, credit, creditUrl, fields },  // fields: metadata
-//     right: { role, label, url, credit, creditUrl, fields },  //   { column: value }
+//     left:  { role, label, title, year, url, credit, creditUrl, fields },
+//     right: { role, label, title, year, url, credit, creditUrl, fields },
 //   }
+//   role: 'original' | 'photochrom'; label: 'Original' / 'Photochrom';
+//   title, year: shown under the image; fields: all metadata { column: value }
 
 const events = new EventTarget();
 let comparisonPair = null;

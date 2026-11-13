@@ -7,7 +7,8 @@
 // children.
 //
 // Zooming: pinch, Ctrl/⌘ + scroll, double-click (Shift: out), keys + − 0.
-// Plain scrolling is left to the page so the viewer never traps page scrolling.
+// Plain scrolling is left to the page so the viewer never traps page scrolling,
+// unless `wheelZoom: true` (e.g. in a modal dialog, where there is no page to scroll).
 
 import Panzoom from '../../vendor/panzoom/panzoom.es.js';
 
@@ -24,8 +25,9 @@ export const clampZoom = (s) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, s));
  *   caller routes events through handleDown/handleMove/handleUp
  * @param options.onChange  called with { scale, x, y } after every change
  * @param options.allowDblClick  predicate deciding whether a double-click zooms
+ * @param options.wheelZoom  plain scrolling zooms too (not only Ctrl/⌘ + scroll)
  */
-export function createZoom(content, { bindPointer = true, onChange = () => {}, allowDblClick = () => true } = {}) {
+export function createZoom(content, { bindPointer = true, onChange = () => {}, allowDblClick = () => true, wheelZoom = false } = {}) {
   const viewport = content.parentElement;
   let pz = null;
 
@@ -102,7 +104,7 @@ export function createZoom(content, { bindPointer = true, onChange = () => {}, a
     'wheel',
     (e) => {
       // Trackpad pinch arrives as wheel events with ctrlKey set.
-      if (!(e.ctrlKey || e.metaKey)) return;
+      if (!(wheelZoom || e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       let delta = e.deltaY || e.deltaX;
       if (e.deltaMode === 1) delta *= 16; // lines -> px

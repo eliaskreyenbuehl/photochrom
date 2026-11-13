@@ -15,6 +15,9 @@
 /* Components set their own display; keep the hidden attribute authoritative. */
 [hidden] { display: none !important; }
 
+/* Page behind an open modal dialog does not scroll. */
+html.has-modal { overflow: hidden; }
+
 /* Text for screen readers only. */
 .sr-only {
   position: absolute;
@@ -287,7 +290,22 @@ body {
   gap: 0.25rem 0.5rem;
 }
 
-#panel-comparison .cmp-credit { color: var(--muted); }
+#panel-comparison .cmp-title {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fg);
+  text-align: left;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+#panel-comparison .cmp-title:hover { text-decoration-color: currentColor; }
+#panel-comparison .cmp-year { color: var(--muted); }
 
 #panel-comparison .cmp-stage {
   position: relative;
@@ -541,40 +559,172 @@ body {
 #panel-comparison .cmp-adjust .button { margin-top: 0.6rem; }
 
 /* Metadata */
-#panel-comparison .cmp-metadata,
 #panel-comparison .analysis {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
 }
 
-#panel-comparison .cmp-metadata h3,
 #panel-comparison .analysis h3 { margin: 0 0 1rem; font-size: 1.1rem; }
 
-#panel-comparison .meta-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+/* Image dialog (full image + metadata) */
+#panel-comparison .cmp-dialog {
+  width: min(1400px, 95vw);
+  height: min(900px, 92vh);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-#panel-comparison .meta-column h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+#panel-comparison .cmp-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
 
-#panel-comparison .meta-key,
-#panel-comparison .meta-all {
+#panel-comparison .cmp-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+
+#panel-comparison .cmp-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+#panel-comparison .cmp-dialog-head h3 { margin: 0; font-size: 1.15rem; }
+#panel-comparison .cmp-dialog-role,
+#panel-comparison .cmp-dialog-year { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+/* Image | divider | metadata; the metadata width is set by the divider (--meta-width). */
+#panel-comparison .cmp-dialog-body {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(7rem, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto min(var(--meta-width, 420px), calc(100% - 250px));
+}
+
+#panel-comparison .cmp-dialog-split {
+  position: relative;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+/* Grip in the middle of the divider. */
+#panel-comparison .cmp-dialog-split::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 3px;
+  height: 2.5rem;
+  transform: translateY(-50%);
+  border-left: 1px solid var(--muted);
+  border-right: 1px solid var(--muted);
+}
+
+#panel-comparison .cmp-dialog-split:hover,
+#panel-comparison .cmp-dialog-split.is-dragging { background: var(--surface-2); }
+
+#panel-comparison .cmp-dialog-split:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+#panel-comparison .cmp-dialog-figure {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+#panel-comparison .cmp-dialog-viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .cmp-dialog-viewport .cmp-zoom { height: 100%; }
+
+#panel-comparison .cmp-dialog-viewport img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+#panel-comparison .cmp-dialog-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#panel-comparison .cmp-dialog-figure figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#panel-comparison .cmp-dialog-info {
+  container-type: inline-size;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 1rem 1rem;
+}
+
+#panel-comparison .cmp-dialog-credit { margin: 0 0 1rem; font-size: 0.85rem; }
+
+@media (max-width: 800px) {
+  #panel-comparison .cmp-dialog-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    overflow-y: auto;
+  }
+
+  #panel-comparison .cmp-dialog-viewport { flex: none; height: 60vh; }
+  #panel-comparison .cmp-dialog-split { display: none; }
+
+  #panel-comparison .cmp-dialog-info { border-top: 1px solid var(--border); overflow: visible; }
+}
+
+/* Metadata list (image dialog) */
+/* Key fields: label | value, the label column at most 40 % wide. */
+#panel-comparison .meta-key {
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
   gap: 0.3rem 1rem;
   margin: 0;
   font-size: 0.875rem;
 }
 
-#panel-comparison .meta-all { margin-top: 0.5rem; font-size: 0.8rem; }
-#panel-comparison .meta-all dt { font-family: ui-monospace, Menlo, monospace; }
-#panel-comparison .meta-column dt { color: var(--muted); }
-#panel-comparison .meta-column dd { margin: 0; overflow-wrap: anywhere; }
-#panel-comparison .meta-column dd ul { margin: 0; padding-left: 1rem; }
-#panel-comparison .meta-column details { margin-top: 0.75rem; }
-#panel-comparison .meta-column summary { color: var(--accent); cursor: pointer; font-size: 0.875rem; }
+/* All fields: raw column names are long, so the name sits above its value. */
+#panel-comparison .meta-all { margin: 0.5rem 0 0; font-size: 0.85rem; }
+#panel-comparison .meta-all dt { margin-top: 0.6rem; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
+
+/* Narrow metadata panel: stack label and value in the key fields too. */
+@container (max-width: 340px) {
+  #panel-comparison .meta-key { display: block; }
+  #panel-comparison .meta-key dt { margin-top: 0.6rem; }
+}
+
+#panel-comparison .cmp-meta dt { color: var(--muted); overflow-wrap: anywhere; }
+#panel-comparison .cmp-meta dd { margin: 0; overflow-wrap: anywhere; }
+#panel-comparison .cmp-meta dd ul { margin: 0; padding-left: 1rem; }
+#panel-comparison .cmp-meta details { margin-top: 0.75rem; }
+#panel-comparison .cmp-meta summary { color: var(--accent); cursor: pointer; font-size: 0.875rem; }
 
 /* Color analysis */
 #panel-comparison .analysis h4 { margin: 0; font-size: 1rem; }
