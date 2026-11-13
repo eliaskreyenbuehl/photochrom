@@ -85,6 +85,9 @@ in the thumbnails folder).
 - **Wikimedia Commons has no IIIF.** `commons_image_url` uses `Special:FilePath`, which can be
   resized with `?width=`. For a IIIF viewer on the right side, check each museum for its own IIIF
   service, or wrap the Commons image as a simple image source.
+- **`Special:FilePath` breaks pixel access (CORS).** Its redirects send no CORS header, so the
+  browser refuses canvas work on these URLs. Resolve them to `upload.wikimedia.org` /
+  `thumb.wikimedia.org` URLs first; details in `Outline.md`, section *CORS (cross-origin images)*.
 - **Rights of museum images vary.** Photochroms are public domain; museum photographs may not be.
 - Place points for countries and regions are centroids, not camera positions.
 - 2,438 records are dated only `1891/1914`.
