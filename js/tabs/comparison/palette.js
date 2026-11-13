@@ -61,6 +61,14 @@ export function extractPalette(image, k, sampleSize = 20000) {
   return palette.sort((a, b) => b.share - a.share);
 }
 
+/** Index of the nearest palette color (in Lab) for every pixel of an analysed image. */
+export function assignPixels(image, palette) {
+  const centers = Float64Array.from(palette.flatMap((c) => c.lab));
+  const assign = new Uint8Array(image.n);
+  for (let i = 0; i < image.n; i++) assign[i] = nearest(image.lab, i, centers, palette.length);
+  return assign;
+}
+
 function dist2(pts, i, centers, c) {
   const dL = pts[i * 3] - centers[c * 3];
   const da = pts[i * 3 + 1] - centers[c * 3 + 1];

@@ -2,13 +2,12 @@
 // Shows the colors of the left/right image (or both, for comparison) in a
 // selectable plot type, plus an extracted color palette per image.
 //
-// Data and plot work is lazy: Plotly and the images are loaded the first time
-// the section becomes visible (activate()).
+// The comparison tab passes the loaded images via setSources(), which starts the
+// analysis; Plotly is loaded from its CDN on the first analysis.
 
-import { DEFAULT_IMAGES, DEFAULT_IMAGE_INFO } from '../../config.js';
 import { loadPlotly } from '../../lib/plotly.js';
+import { createPaletteView } from './palette-view.js';
 import { analyzeImage, MAX_SAMPLE } from './pixels.js';
-import { extractPalette } from './palette.js';
 import { PLOT_TYPES } from './plot-types.js';
 
 // Series colors in compare mode (categorical slots 1 and 2, validated colorblind-safe pair).
@@ -24,15 +23,16 @@ const state = {
   paletteSize: 8,
 };
 
-const images = { left: null, right: null }; // analyzeImage() results
+let sources = null; // { id, left: { label, img }, right: { label, img } }
+let images = { left: null, right: null }; // analyzeImage() results for `sources`
 let els = null;
+let palettes = null;
 let Plotly = null;
-let started = false;
 let drawToken = 0;
+let analysisToken = 0;
 let renderQueue = Promise.resolve();
 
-const option = (value, text, selected) =>
-  `<option value="${value}"${selected ? ' selected' : ''}>${text}</option>`;
+const option = (value, text, selected) => `<option value="${value}"${selected ? ' selected' : ''}>${text}</option>`;
 
 export function render(container) {
   const section = document.createElement('section');
@@ -40,20 +40,6 @@ export function render(container) {
   section.setAttribute('aria-labelledby', 'analysis-heading');
   section.innerHTML = `
     <h3 id="analysis-heading">Color analysis</h3>
-
-    <div class="analysis-sources">
-      ${SIDES.map(
-        (side) => `
-        <figure class="analysis-source" data-side="${side}">
-          <div class="analysis-thumb" aria-hidden="true"></div>
-          <figcaption>
-            <span class="analysis-swatch" style="background:${SERIES_COLORS[side]}" aria-hidden="true"></span>
-            <strong></strong>
-            <a class="analysis-credit" target="_blank" rel="noopener"></a>
-          </figcaption>
-        </figure>`
-      ).join('')}
-    </div>
 
     <div class="analysis-controls">
       <fieldset class="segmented">
@@ -63,7 +49,7 @@ export function render(container) {
             (value) => `
           <label>
             <input type="radio" name="analysis-source" value="${value}"${value === state.source ? ' checked' : ''}>
-            <span>${value === 'both' ? 'Compare both' : DEFAULT_IMAGE_INFO[value].label}</span>
+            <span>${value === 'both' ? 'Compare both' : ''}</span>
           </label>`
           )
           .join('')}
@@ -95,9 +81,10 @@ export function render(container) {
         </select>
       </label>
     </div>
-    <p class="analysis-note">Dominant colors found by k-means clustering in CIE Lab; percentages are the share of pixels closest to each color.</p>
-    <div class="analysis-palettes"></div>
+    <p class="analysis-note">Dominant colors found by k-means clustering in CIE Lab; percentages are the share of pixels closest to each color. Select a color to highlight where it occurs.</p>
   `;
+  palettes = createPaletteView();
+  section.append(palettes.element);
   container.append(section);
 
   els = {
@@ -105,17 +92,7 @@ export function render(container) {
     description: section.querySelector('.analysis-description'),
     status: section.querySelector('.analysis-status'),
     plot: section.querySelector('.analysis-plot'),
-    palettes: section.querySelector('.analysis-palettes'),
   };
-
-  for (const side of SIDES) {
-    const fig = section.querySelector(`.analysis-source[data-side="${side}"]`);
-    const info = DEFAULT_IMAGE_INFO[side];
-    fig.querySelector('strong').textContent = info.label;
-    const credit = fig.querySelector('.analysis-credit');
-    credit.textContent = info.credit;
-    credit.href = info.creditUrl;
-  }
 
   section.querySelectorAll('input[name="analysis-source"]').forEach((input) =>
     input.addEventListener('change', () => {
@@ -139,37 +116,38 @@ export function render(container) {
   updateDescription();
 }
 
-export function activate() {
-  if (!started) {
-    started = true;
-    start();
-  } else if (Plotly && els.plot.data) {
-    // The window may have been resized while the tab was hidden.
-    Plotly.Plots.resize(els.plot);
+/** Set the images to analyse: { id, left: { label, img }, right: { label, img } }. */
+export function setSources(next) {
+  sources = next;
+  for (const side of SIDES) {
+    const label = els.section.querySelector(`input[value="${side}"] + span`);
+    label.textContent = next[side].label;
   }
+  analyse();
 }
 
-async function start() {
-  setStatus('Loading images and plotting library…');
-  const [plotly, ...results] = await Promise.allSettled([
-    loadPlotly(),
-    ...SIDES.map((side) => analyzeImage(DEFAULT_IMAGES[side])),
-  ]);
+export function activate() {
+  if (Plotly && els.plot.data) Plotly.Plots.resize(els.plot); // window may have been resized while hidden
+}
+
+async function analyse() {
+  const token = ++analysisToken;
+  const current = sources;
+  setStatus('Analysing colors…');
+  // Let the status paint before the synchronous pixel work.
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const [plotly, ...results] = await Promise.allSettled([loadPlotly(), ...SIDES.map((side) => analyzeImage(current[side].img))]);
+  if (token !== analysisToken) return;
 
   const errors = [];
+  images = { left: null, right: null };
   SIDES.forEach((side, i) => {
-    const result = results[i];
-    if (result.status === 'fulfilled') {
-      images[side] = result.value;
-      const thumb = els.section.querySelector(`.analysis-source[data-side="${side}"] .analysis-thumb`);
-      thumb.append(result.value.canvas);
-    } else {
-      errors.push(result.reason.message);
-      // Without this image, only the other one can be analysed.
-      els.section.querySelector(`input[value="${side}"]`).disabled = true;
-      els.section.querySelector('input[value="both"]').disabled = true;
-    }
+    const ok = results[i].status === 'fulfilled';
+    if (ok) images[side] = results[i].value;
+    else errors.push(results[i].reason.message);
+    els.section.querySelector(`input[value="${side}"]`).disabled = !ok;
   });
+  els.section.querySelector('input[value="both"]').disabled = !(images.left && images.right);
 
   if (plotly.status === 'rejected') errors.unshift(plotly.reason.message);
   else Plotly = plotly.value;
@@ -199,7 +177,7 @@ function currentSeries() {
   const sides = state.source === 'both' ? SIDES : [state.source];
   return sides
     .filter((side) => images[side])
-    .map((side) => ({ label: DEFAULT_IMAGE_INFO[side].label, color: SERIES_COLORS[side], image: images[side] }));
+    .map((side) => ({ label: sources[side].label, color: SERIES_COLORS[side], image: images[side] }));
 }
 
 /**
@@ -230,7 +208,7 @@ function drawPlot() {
       await Plotly.react(els.plot, data, layout, {
         responsive: true,
         displaylogo: false,
-        toImageButtonOptions: { filename: `color-analysis-${type.id}-${state.source}`, scale: 2 },
+        toImageButtonOptions: { filename: `${sources.id}-color-${type.id}-${state.source}`, scale: 2 },
       });
       if (isCurrent()) setStatus('');
     })
@@ -242,45 +220,12 @@ function drawPlot() {
 }
 
 function drawPalettes() {
-  els.palettes.replaceChildren(
-    ...SIDES.filter((side) => images[side]).map((side) => {
-      const palette = extractPalette(images[side], state.paletteSize);
-      const block = document.createElement('div');
-      block.className = 'palette';
-
-      const title = document.createElement('h5');
-      title.textContent = DEFAULT_IMAGE_INFO[side].label;
-
-      // Proportional strip: each segment's width is its share of the pixels.
-      const strip = document.createElement('div');
-      strip.className = 'palette-strip';
-      strip.setAttribute('aria-hidden', 'true');
-      for (const c of palette) {
-        const seg = document.createElement('span');
-        seg.style.background = c.hex;
-        seg.style.flexGrow = String(c.share);
-        seg.title = `${c.hex} · ${(c.share * 100).toFixed(1)}%`;
-        strip.append(seg);
-      }
-
-      const list = document.createElement('ol');
-      list.className = 'palette-swatches';
-      for (const c of palette) {
-        const item = document.createElement('li');
-        const chip = document.createElement('span');
-        chip.className = 'palette-chip';
-        chip.style.background = c.hex;
-        const hex = document.createElement('code');
-        hex.textContent = c.hex;
-        const share = document.createElement('span');
-        share.className = 'palette-share';
-        share.textContent = `${(c.share * 100).toFixed(1)}%`;
-        item.append(chip, hex, share);
-        list.append(item);
-      }
-
-      block.append(title, strip, list);
-      return block;
-    })
+  palettes.update(
+    SIDES.filter((side) => images[side]).map((side) => ({
+      label: sources[side].label,
+      image: images[side],
+      fileStem: `${sources.id}-${side}`,
+    })),
+    state.paletteSize
   );
 }

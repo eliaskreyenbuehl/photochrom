@@ -22,7 +22,7 @@ export function seededRandom(seed) {
   };
 }
 
-function loadImage(url) {
+export function loadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     // Required for pixel access when the image is served from another origin.
@@ -34,13 +34,14 @@ function loadImage(url) {
 }
 
 /**
- * Load an image and extract its pixels.
- * @returns {Promise<{url, width, height, canvas, n, rgb: Uint8Array, lab: Float32Array, order: Uint32Array}>}
- *   rgb/lab hold 3 values per opaque pixel; `order` is a random permutation prefix
- *   (length ≤ MAX_SAMPLE) of pixel indices used for sampling.
+ * Extract the pixels of a loaded <img>.
+ * @returns {Promise<{width, height, canvas, n, rgb: Uint8Array, lab: Float32Array, pos: Uint32Array, order: Uint32Array}>}
+ *   rgb/lab hold 3 values per opaque pixel; pos[i] is that pixel's index on the
+ *   canvas; `order` is a random permutation prefix (length ≤ MAX_SAMPLE) of pixel
+ *   indices used for sampling.
  */
-export async function analyzeImage(url) {
-  const img = await loadImage(url);
+export async function analyzeImage(img) {
+  const url = img.currentSrc || img.src; // for the error message
   const scale = Math.min(1, ANALYSIS_SIZE / Math.max(img.naturalWidth, img.naturalHeight));
   const width = Math.max(1, Math.round(img.naturalWidth * scale));
   const height = Math.max(1, Math.round(img.naturalHeight * scale));
@@ -63,6 +64,7 @@ export async function analyzeImage(url) {
   const total = width * height;
   const rgb = new Uint8Array(total * 3);
   const lab = new Float32Array(total * 3);
+  const pos = new Uint32Array(total);
   let n = 0;
   for (let i = 0; i < total; i++) {
     if (rgba[i * 4 + 3] < 128) continue;
@@ -76,6 +78,7 @@ export async function analyzeImage(url) {
     lab[n * 3] = L;
     lab[n * 3 + 1] = A;
     lab[n * 3 + 2] = B;
+    pos[n] = i;
     n++;
   }
 
@@ -92,13 +95,13 @@ export async function analyzeImage(url) {
   }
 
   return {
-    url,
     width,
     height,
     canvas,
     n,
     rgb: rgb.subarray(0, n * 3),
     lab: lab.subarray(0, n * 3),
+    pos: pos.subarray(0, n),
     order: indices.slice(0, k),
   };
 }
