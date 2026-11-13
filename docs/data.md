@@ -27,6 +27,7 @@ or `images-legacy-2k.zip`). The images are not in this repo.
 | `data/zenodo/photochrom-main-place.csv` | 4,224 | `identifier_swisscollections` | main motif per legacy record (partial) |
 | `data/zenodo/embeddings-siglip2/embeddings.npy` | 9,582 × 1152, float32 | row number | SigLIP 2 image vectors for similarity and free-text search |
 | `data/zenodo/embeddings-siglip2/dateien.csv` | 9,582 | `zeile` (= row), `image_filename` | maps each vector row to an image |
+| `data/catalog.json` | 9,610 | `id` (MMS ID) | **derived**: compact join of the files above for the web app, built by `scripts/build_catalog.py`; field list and provenance in its `fields` block |
 | `data/artwork-pairs.csv` | 240 | `mms_id` | **photochroms that reproduce paintings, matched to the original artwork** (see below) |
 
 ## Links between files

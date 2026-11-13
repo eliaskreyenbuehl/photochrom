@@ -25,8 +25,16 @@ The site consists of 3 tabs:
 
 ### Media Library Tab
 
-- **Media Gallery of Picture Set**
-- **Image analyses over time** by plotting metadata of all images over time
+The start page: the whole collection (9,610 records) as timeline, filters and work list. Here users choose the main images (left side) for pairing.
+
+- **Timeline** (horizontal): bars for records dated to a single year, a lane below for records dated only as a span (e.g. 1891–1914). Drag to select years; a record matches if its span overlaps the selection. Option "exact dates only". Probable typos in catalog dates are flagged, not corrected, and left out of the axis.
+- **Filter pills**: genre, country, image content, source (with IIIF image, reproduces a painting). OR within a group, AND between groups; each pill shows its count given the other filters. Free-text search over title, place, country and MMS ID.
+- **Work list** with a checkbox per row: checked works become main images for the Pair Matching tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Click a row for details.
+- **Selection** is kept in the browser only (localStorage), with export (CSV, JSON) and import.
+- **Images**: recatalogued records via IIIF from e-rara. Legacy records have no IIIF yet; plan: static IIIF level 0 thumbnails in a separate repository `photochrom-images` on GitHub Pages.
+- **Image analyses over time**: the timeline is the first step; later e.g. color values over time.
+
+Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` (about 0.9 MB compressed), which all tabs share.
 
 ### Pair matching Tab
 
@@ -126,7 +134,16 @@ js/tabs/comparison/       sub-modules of the comparison tab
   pixels.js                 image loading, pixel extraction, seeded sampling
   palette.js                palette extraction (k-means in Lab)
   cie1931.js                CIE 1931 spectral locus + chromaticity diagram background
-js/tabs/media-library.js  Media Library tab
+js/lib/catalog.js         loadCatalog() for data/catalog.json, image URLs (IIIF), links, date labels
+js/tabs/media-library.js  Media Library tab: wires the modules below together
+js/tabs/media-library/
+  filters.js                filter model, matching, facet counts (no DOM)
+  timeline.js               SVG timeline with year brushing
+  list.js                   virtual-scrolling work list with checkboxes
+  details.js                detail panel for one record
+  exchange.js               export/import of the selection (CSV, JSON)
+css/media-library.css     styles of the Media Library (and candidate cards in Pair Matching)
+scripts/build_catalog.py  builds data/catalog.json from the Zenodo CSVs (run after data updates)
 js/tabs/pair-matching.js  Pair Matching tab
 .nojekyll                 disables Jekyll processing on GitHub Pages
 ```
