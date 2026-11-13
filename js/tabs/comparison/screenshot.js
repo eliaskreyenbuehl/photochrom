@@ -71,8 +71,10 @@ function renderStage(diff, region) {
 
   if (store.view === 'overlay') {
     ctx.globalAlpha = store.opacity;
+    if (store.differenceBlend) ctx.globalCompositeOperation = 'difference';
     ctx.drawImage(warpedOverlay(W, H, s, ox, oy), 0, 0);
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
   } else if (store.view === 'slider') {
     const x = Math.round(store.divider * fullW - ox);
     ctx.save();
@@ -118,7 +120,8 @@ function withCaption(image, detail) {
   const pad = Math.round(font * 1.2);
   const measure = createCanvas(1, 1).getContext('2d');
   measure.font = `${font}px system-ui, sans-serif`;
-  const name = `${VIEW_LABELS[store.view]}${detail ? ' (zoomed detail)' : ''}`;
+  const blend = store.view === 'overlay' && store.differenceBlend ? ', difference blend' : '';
+  const name = `${VIEW_LABELS[store.view]}${blend}${detail ? ' (zoomed detail)' : ''}`;
   const view = store.view === 'side' ? name : `${name}: ${overlayImage().label} on ${baseImage().label}`;
   const texts = [`${store.pair.label} · ${view}`, ...SIDES.map((side) => `${store.images[side].label}: ${store.images[side].credit}`)];
   const lines = texts.flatMap((t) => wrap(measure, t, image.width - 2 * pad));

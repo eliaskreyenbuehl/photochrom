@@ -522,6 +522,11 @@ body {
   margin-top: 0.9rem;
 }
 
+#panel-comparison .cmp-check { margin-top: 0.6rem; }
+#panel-comparison .cmp-check label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
+#panel-comparison .cmp-check input { margin: 0; accent-color: var(--accent); }
+#panel-comparison .cmp-check .cmp-note { margin: 0.2rem 0 0; }
+
 #panel-comparison .cmp-align-status,
 #panel-comparison .cmp-diff-summary {
   margin: 0.6rem 0 0;

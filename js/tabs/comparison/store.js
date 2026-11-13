@@ -2,7 +2,7 @@
 // Mutate only through update(); listeners receive the change reason so they can
 // skip work that is not affected (e.g. 'transform' does not rebuild canvases).
 //
-// Reasons: 'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'divider' | 'adjust' | 'diff'
+// Reasons: 'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'blend' | 'divider' | 'adjust' | 'diff'
 
 import { defaultAdjustments } from './adjustments.js';
 import { apply, identity, multiply, rotation, scaling, translation } from './geometry.js';
@@ -23,6 +23,7 @@ export const store = {
   manual: defaultManual(), // user adjustments on top of H (base px, factor, degrees)
   alignedH: false, // H holds an alignment (auto-align, or manual moves kept through a swap)
   opacity: 0.5,
+  differenceBlend: false, // overlay view: overlay drawn with mix-blend-mode difference
   divider: 0.5, // slider position, fraction of the base width
   adjust: defaultAdjust(),
   diff: { sensitivity: 50, opacity: 0.75 },

@@ -281,13 +281,14 @@ export function createViewer() {
     overlayImage().display.style.filter = filterString(store.adjust[store.overlaySide]);
   }
 
-  /** Overlay position and opacity (runs on every drag move). */
+  /** Overlay position, opacity and blend mode (runs on every drag move). */
   function applyOverlay() {
     const overlay = overlayImage();
     const oc = overlay.display;
     const m = multiply(translation(geo.pad, geo.pad), scaling(geo.vs), overlayMatrix(), scaling(overlay.natW / oc.width, overlay.natH / oc.height));
     oc.style.transform = toCssMatrix3d(m);
     oc.style.opacity = store.view === 'overlay' ? String(store.opacity) : '1';
+    oc.style.mixBlendMode = store.view === 'overlay' && store.differenceBlend ? 'difference' : 'normal';
   }
 
   // The slider divider lives in the stage (screen space), not in the zoomed
@@ -569,7 +570,7 @@ export function createViewer() {
       layout();
     } else if (!baseImage() || store.view === 'side') {
       if (reason === 'adjust') applyFilters();
-    } else if (reason === 'transform' || reason === 'opacity') {
+    } else if (reason === 'transform' || reason === 'opacity' || reason === 'blend') {
       applyOverlay();
     } else if (reason === 'divider') {
       applyDivider();

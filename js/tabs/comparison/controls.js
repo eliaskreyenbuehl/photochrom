@@ -29,6 +29,10 @@ export function createControls({ onAutoAlign }) {
         <select name="overlay-side"></select>
       </label>
       ${rangeRow('opacity', 'Opacity', 0, 100, 1, 'data-only="overlay"')}
+      <div class="cmp-check" data-only="overlay">
+        <label><input type="checkbox" name="difference-blend"> Difference blend</label>
+        <p class="cmp-note">Shows the difference of both images: matching areas turn dark, misaligned edges light up. Most useful at 100 % opacity.</p>
+      </div>
       ${rangeRow('divider', 'Divider', 0, 100, 0.5, 'data-only="slider"')}
       ${rangeRow('scale', 'Scale', -300, 300, 1)}
       ${rangeRow('rotation', 'Rotation', -180, 180, 0.1)}
@@ -91,6 +95,7 @@ export function createControls({ onAutoAlign }) {
     update({ overlaySide: e.target.value, H: inverse, manual: defaultManual(), alignedH: isAligned() }, 'swap');
   });
   input('opacity').addEventListener('input', (e) => update({ opacity: e.target.value / 100 }, 'opacity'));
+  input('difference-blend').addEventListener('change', (e) => update({ differenceBlend: e.target.checked }, 'blend'));
   input('divider').addEventListener('input', (e) => update({ divider: e.target.value / 100 }, 'divider'));
   input('scale').addEventListener('input', (e) => setManual({ scale: 2 ** (e.target.value / 100) }));
   input('rotation').addEventListener('input', (e) => setManual({ rotation: Number(e.target.value) }));
@@ -186,6 +191,7 @@ export function createControls({ onAutoAlign }) {
     if (reason === 'pair') {
       setAlignStatus('');
       setValue('opacity', Math.round(store.opacity * 100), `${Math.round(store.opacity * 100)} %`);
+      input('difference-blend').checked = store.differenceBlend;
       setValue('divider', store.divider * 100, `${Math.round(store.divider * 100)} %`);
       setValue('sensitivity', store.diff.sensitivity, String(store.diff.sensitivity));
       setValue('heat', Math.round(store.diff.opacity * 100), `${Math.round(store.diff.opacity * 100)} %`);
