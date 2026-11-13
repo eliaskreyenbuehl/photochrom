@@ -7,23 +7,23 @@ Findings from 13 November 2026 that matter for the web app. See also [data.md](d
 
 Pixel access in the browser (`getImageData`, filters on a canvas, colour analysis, screenshots with
 `canvas.toDataURL`) only works if the image host sends an `Access-Control-Allow-Origin` header.
-Checked on 13 November 2026:
+Checked on 13 November 2026 with GET requests:
 
-| Host | Example | CORS | Display in `<img>` | Pixel access on canvas |
-|---|---|---|---|---|
-| e-rara IIIF (photochroms) | `https://www.e-rara.ch/i3f/v21/30620827/full/,560/0/default.jpg` | **no header** | yes | **no** (canvas is tainted) |
-| Wikimedia Commons (originals) | `https://upload.wikimedia.org/wikipedia/commons/...` | `*` | yes | yes, with `img.crossOrigin = 'anonymous'` |
-| This repo on GitHub Pages | `data/sample/*.jpg` | same origin | yes | yes |
+| Host | Example | CORS on GET | Pixel access on canvas |
+|---|---|---|---|
+| e-rara IIIF image (v21 and v20) | `https://www.e-rara.ch/i3f/v21/30620827/full/,560/0/default.jpg` | `*` | yes, with `img.crossOrigin = 'anonymous'` |
+| e-rara IIIF `info.json` and manifest | `https://www.e-rara.ch/i3f/v20/30620826/manifest` | `*` | n/a (JSON, loadable with `fetch`) |
+| Wikimedia Commons (originals) | `https://upload.wikimedia.org/wikipedia/commons/...` | `*` | yes, with `img.crossOrigin = 'anonymous'` |
+| This repo on GitHub Pages | `data/sample/*.jpg` | same origin | yes |
 
-Consequences:
+Notes:
 
-- Showing photochroms side by side via IIIF works; CSS filters (`filter: brightness() grayscale()`) also
-  work on tainted images, because they do not read pixels.
-- **Colour analysis, canvas filters, screenshots and auto-alignment need the photochrom pixels.**
-  For now, use the images in `data/sample/`. For more pairs, copy the needed images into the repo
-  (photochroms are public domain) or ask e-rara for CORS headers.
-- Do not load e-rara images with `crossOrigin = 'anonymous'`: without the header the browser then
-  refuses to load the image at all.
+- **Test with GET, not HEAD.** e-rara omits the CORS header on HEAD requests (`curl -I`), which
+  looks like “no CORS” although the browser gets the header on the real request.
+- Set `img.crossOrigin = 'anonymous'` **before** setting `img.src`, otherwise the canvas is tainted.
+- Not tested yet in a real browser on GitHub Pages; check early, including browser caching (an image
+  first loaded without `crossOrigin` can be served from cache without the header).
+- So IIIF can likely be used for pixel work too; `data/sample/` stays the offline fallback.
 - Museum images have varying rights. The Gleyre original in the sample is CC BY-SA 4.0 (credit
   Françoise Foliot); the app has to show that credit. See `data/sample/README.md`.
 
