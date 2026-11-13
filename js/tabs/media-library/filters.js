@@ -28,7 +28,7 @@ export function isEmpty(f) {
 }
 
 /** Usable for the date filter: dated within 1889–1914 (open or capped ends are set to 1914). */
-export const datable = (r) => r.y0 != null && r.df !== 'suspect' && r.df !== 'outside';
+export const datable = (r) => r.y0 != null && r.df !== 'suspect';
 /** Dated to a single year, without any correction. */
 export const exactlyDated = (r) => datable(r) && !r.df && r.y0 === r.y1;
 

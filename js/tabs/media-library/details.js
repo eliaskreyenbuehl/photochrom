@@ -42,7 +42,6 @@ export function createDetails(container, catalog) {
     const DATE_NOTES = {
       open: 'Open-ended date in the catalog (“after”). Photochroms were produced until 1914, so the range ends there.',
       capped: 'The catalog date ends after 1914. Photochroms were produced until 1914, so the range is cut at 1914 (*).',
-      outside: 'The catalog date lies after 1914, outside the production period of the photochroms. Left as catalogued and excluded by the date filter.',
       suspect: 'This date looks like a typo in the catalog record. Shown as catalogued and excluded by the date filter.',
     };
     const dateNote = DATE_NOTES[rec.df] ? `<p class="note">${DATE_NOTES[rec.df]}</p>` : '';

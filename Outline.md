@@ -25,14 +25,15 @@ The site consists of 3 tabs:
 
 ### Media Library Tab
 
-The start page: the whole collection (9,610 records) as timeline, filters and work list. Here users choose the main images (left side) for pairing.
+The start page: the whole collection (9,604 records) as filters and an image mosaic. Here users choose the main images (left side) for pairing.
 
-- **Timeline** (horizontal): bars for records dated to a single year, a lane below for records dated only as a span (e.g. 1891–1914). Drag to select years; a record matches if its span overlaps the selection. Option "exact dates only". Probable typos in catalog dates are flagged, not corrected, and left out of the axis.
+- **Date filter** (compact, in the filter panel): a tiny histogram of works per year, a range slider with two handles and START/END fields. The axis is fixed to 1889–1914. A record matches if its date range overlaps the selection. Option "exact dates only". Histogram: dark = dated to a single year, light = date spans spread evenly over their years (an estimate).
+- **Date rules** (`scripts/build_catalog.py`): photochrom production ended 1914, so records starting after 1914 are excluded from the catalog (6 records). Ranges ending after 1914 are cut at 1914 (flag `capped`), open ends ("after 1905") end at 1914 (flag `open`). Probable typos in catalog dates are flagged `suspect`, not corrected, and excluded by the date filter. The catalogued date is always shown as well.
 - **Filter pills**: genre, country, image content, source (with IIIF image, reproduces a painting). OR within a group, AND between groups; each pill shows its count given the other filters. Free-text search over title, place, country and MMS ID.
-- **Work list** with a checkbox per row: checked works become main images for the Pair Matching tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Click a row for details.
-- **Selection** is kept in the browser only (localStorage), with export (CSV, JSON) and import.
-- **Images**: recatalogued records via IIIF from e-rara. Legacy records have no IIIF yet; plan: static IIIF level 0 thumbnails in a separate repository `photochrom-images` on GitHub Pages.
-- **Image analyses over time**: the timeline is the first step; later e.g. color values over time.
+- **Views**: *Mosaic* (default) shows the filtered works as uniform image tiles; *List* shows the work list with sortable columns. Both use virtual scrolling (only visible rows are in the page) and share the selection. Click a tile or row for details.
+- **Selection**: the checkbox on a tile or row makes the work a main image for the Pair Matching tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Kept in the browser only (localStorage), with export (CSV, JSON) and import.
+- **Images**: thumbnails come from an own static IIIF level 0 service (`scripts/build_thumbs_iiif.py`, separate repository `photochrom-images` on GitHub Pages), so scrolling does not load hundreds of images from e-rara. Until it is published, recatalogued records fall back to e-rara and legacy records appear only in the list. The detail panel loads the larger image from e-rara IIIF where available.
+- **Image analyses over time**: the date histogram is the first step; later e.g. color values over time.
 
 Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` (about 0.9 MB compressed), which all tabs share.
 
@@ -134,16 +135,18 @@ js/tabs/comparison/       sub-modules of the comparison tab
   pixels.js                 image loading, pixel extraction, seeded sampling
   palette.js                palette extraction (k-means in Lab)
   cie1931.js                CIE 1931 spectral locus + chromaticity diagram background
-js/lib/catalog.js         loadCatalog() for data/catalog.json, image URLs (IIIF), links, date labels
+js/lib/catalog.js         loadCatalog() for data/catalog.json, thumbnail/IIIF image URLs (THUMB_IIIF_BASE), links, date labels
 js/tabs/media-library.js  Media Library tab: wires the modules below together
 js/tabs/media-library/
   filters.js                filter model, matching, facet counts (no DOM)
-  timeline.js               SVG timeline with year brushing
+  date-filter.js            compact date filter: tiny histogram, two-handle slider, START/END
+  mosaic.js                 virtual-scrolling image mosaic with checkboxes
   list.js                   virtual-scrolling work list with checkboxes
   details.js                detail panel for one record
   exchange.js               export/import of the selection (CSV, JSON)
 css/media-library.css     styles of the Media Library (and candidate cards in Pair Matching)
 scripts/build_catalog.py  builds data/catalog.json from the Zenodo CSVs (run after data updates)
+scripts/build_thumbs_iiif.py  builds static IIIF level 0 thumbnails for the photochrom-images repository
 js/tabs/pair-matching.js  Pair Matching tab
 .nojekyll                 disables Jekyll processing on GitHub Pages
 ```

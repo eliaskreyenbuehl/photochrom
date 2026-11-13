@@ -137,17 +137,15 @@ def date_flag(y0, y1):
     'suspect' probably a typo in the catalogue (e.g. 1804/1896, 1814/1889, 1891/1941),
               left uncorrected and outside the date filter
     'open'    open end ('nach 1905' is catalogued as 1905/9999), end set to 1914
-    'outside' starts after 1914, outside the production period, outside the date filter
     'capped'  ends after 1914, end set to 1914
+    Records starting after 1914 are excluded before this function is called.
     """
     if y0 is None:
         return None
     if y1 == 9999:
-        return "open" if y0 <= LAST_YEAR else "outside"
+        return "open"
     if y0 < FIRST_YEAR or y1 - y0 > 40:
         return "suspect"
-    if y0 > LAST_YEAR:
-        return "outside"
     if y1 > LAST_YEAR:
         return "capped"
     return None
@@ -163,10 +161,14 @@ def main():
         places.setdefault(r["identifier_swisscollections"], []).append(r)
 
     feature_keys = list(FEATURES)
-    records, unmapped, undated, flagged = [], Counter(), [], []
+    records, unmapped, undated, flagged, excluded = [], Counter(), [], [], []
     for r in meta:
         mms = r["identifier_swisscollections"]
         y0, y1 = parse_years(r["date_of_publication_or_production_standardised"])
+        if y0 is not None and y0 > LAST_YEAR:
+            # photochrom production ended 1914: such records are excluded
+            excluded.append((mms, r["date_of_publication_or_production"]))
+            continue
         flag = date_flag(y0, y1)
         if y0 is None:
             undated.append(mms)
@@ -174,8 +176,6 @@ def main():
             flagged.append((mms, r["date_of_publication_or_production"], flag))
         if flag in ("open", "capped"):
             y1 = LAST_YEAR
-        elif flag == "outside" and y1 == 9999:
-            y1 = y0
 
         countries, labels = [], []
         for p in places.get(mms, []):
@@ -231,6 +231,10 @@ def main():
                   "https://doi.org/10.5281/zenodo.24141227 (metadata CC0)",
         "built": date.today().isoformat(),
         "years": [FIRST_YEAR, LAST_YEAR],
+        "excluded": {
+            "rule": "records starting after 1914 are excluded: photochrom production ended 1914",
+            "records": [{"id": mms, "date": raw} for mms, raw in excluded],
+        },
         "genres": GENRES,
         "features": [[k, FEATURES[k]] for k in feature_keys],
         "fields": {
@@ -238,10 +242,10 @@ def main():
             "t": "title", "d": "date as catalogued",
             "y0/y1": "first/last year from date_of_publication_or_production_standardised; null if not parseable",
             "df": "date flag, see date_flag() in scripts/build_catalog.py. Production period 1889-1914 "
-                  "(ZB metadata specialists): 'open' = open end (y0/9999), y1 set to 1914; "
-                  "'capped' = ends after 1914, y1 set to 1914; 'outside' = starts after 1914; "
-                  "'suspect' = probably a typo in the catalogue. 'outside' and 'suspect' are left "
-                  "uncorrected and excluded by the date filter. The catalogued date is always in 'd'.",
+                  ": 'open' = open end (y0/9999), y1 set to 1914; "
+                  "'capped' = ends after 1914, y1 set to 1914; "
+                  "'suspect' = probably a typo in the catalogue, left uncorrected and excluded by the "
+                  "date filter. The catalogued date is always in 'd'.",
             "s": "subset: r = recatalogued (IIIF), l = legacy (no IIIF)",
             "g": "genre, machine-generated (photochrom-image-content.csv, unreviewed)",
             "c": "present-day countries derived from GND area codes of all place mentions "
@@ -261,6 +265,9 @@ def main():
 
     print(f"{len(records)} records -> {OUT.relative_to(ROOT)} ({OUT.stat().st_size / 1e6:.2f} MB)")
     print(f"years {catalog['years']}, undated: {len(undated)} {undated[:5]}")
+    print(f"excluded (start after {LAST_YEAR}): {len(excluded)}")
+    for mms, raw in excluded:
+        print(f"  {mms} {raw}")
     for mms, raw, flag in flagged:
         print(f"  date {flag}: {mms} {raw}")
     print(f"records without country: {sum(1 for r in records if not r['c'])}")

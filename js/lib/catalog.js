@@ -68,7 +68,7 @@ export const doiUrl = (rec) => (rec.doi ? `https://doi.org/${rec.doi}` : '');
 /** Human-readable date. Flags are explained in the detail panel (see build_catalog.py). */
 export function dateLabel(rec) {
   if (rec.y0 == null) return rec.d || 'undated';
-  if (rec.df === 'suspect' || rec.df === 'outside') return `${rec.d} (?)`;
+  if (rec.df === 'suspect') return `${rec.d} (?)`;
   if (rec.df === 'open') return `after ${rec.y0}`;
   const range = rec.y0 === rec.y1 ? String(rec.y0) : `${rec.y0}–${rec.y1}`;
   return rec.df === 'capped' ? `${range}*` : range;
