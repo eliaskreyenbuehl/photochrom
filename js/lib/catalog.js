@@ -7,7 +7,7 @@ export const CATALOG_URL = 'data/catalog.json';
 // scripts/build_thumbs_iiif.py and published as a separate repository (photochrom-images).
 // Identifier = record field "img". Layout: <base>/<img>/full/<width>,/0/default.jpg
 // Empty: recatalogued records fall back to e-rara, legacy records have no image.
-const THUMB_IIIF_BASE_DEFAULT = '';
+const THUMB_IIIF_BASE_DEFAULT = 'https://eliaskreyenbuehl.github.io/photochrom-images/iiif';
 
 // Development only: ?thumbs=<url> overrides the base, e.g. a local server
 // (python -m http.server 8766 in the photochrom-images folder, then ?thumbs=http://127.0.0.1:8766/iiif).

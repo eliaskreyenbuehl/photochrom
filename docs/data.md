@@ -74,8 +74,9 @@ Museum Vienna (13), Musée d'Orsay (9).
 (`images-legacy-preview.zip`, `images-recatalogued-preview.zip`): per image an `info.json`
 (IIIF Image API 2.1, level 0) and one 300 px wide JPEG at `iiif/<img>/full/300,/0/default.jpg`.
 The identifier is the catalog field `img` (image file name without extension). 9,591 images,
-19,182 files, about 166 MB. They are published as a separate repository (`photochrom-images`),
-not in this one. Set `THUMB_IIIF_BASE` in `js/lib/catalog.js` to its URL; for local testing use
+19,182 files, about 166 MB. They are published as a separate repository,
+https://github.com/eliaskreyenbuehl/photochrom-images, served at
+`https://eliaskreyenbuehl.github.io/photochrom-images/iiif` (`THUMB_IIIF_BASE` in `js/lib/catalog.js`). For local testing use
 `?thumbs=<url>` (e.g. `?thumbs=http://127.0.0.1:8766/iiif` with `python -m http.server 8766`
 in the thumbnails folder).
 
