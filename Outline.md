@@ -84,7 +84,7 @@ Image Overlay:
 - **Compare image overlay match percentage** by detecting cropping (one image is only part of another)
 - **Show image manipulations** like people added or landscape changed
 
-tbd: crop out the color palette on scans to only analyze the colors of the actual image and not the palette.
+Color charts on scans: see [Print area](#print-area-scans-without-color-charts) below. Color analysis uses only the print area.
 
 Image analysis:
 
@@ -99,6 +99,21 @@ Use a plotting library like Plotly or Chart.js for the plots.
 - **Generate color palette for image**
 - **Highlight color palette in image** (highlight the colors of the palette in the image when clicking on it)
 - **Option to copy color palette to clipboard** (as hex values or as image)
+
+## Print area: scans without color charts
+
+About half of the scans (4,893 of 9,610, `scan_farbkarte = ja`) show a Kodak color control strip and/or a gray scale next to the print, on a dark or gray scanner background. All tabs should show and analyze **only the print**.
+
+- **Stored as coordinates, not as cropped images.** `data/print-area.csv`: one row per image (`img` = image file name without extension, as in `catalog.json`), box `x0, y0, x1, y1` as **fractions of width and height** (0–1), so the same box applies to every resolution (300 px thumbnail, 800 px preview, 2K/4K scan, IIIF). Plus `note`, `method`, `review_status` (provenance). Images without a row: use the whole image.
+- **Use in the app:** a shared helper (e.g. in `js/lib/catalog.js`) returns the box for a record. IIIF images can be requested with a region (`/<x>,<y>,<w>,<h>/` or `pct:x,y,w,h`) on e-rara; for the static thumbnails and local files, draw only the box (canvas `drawImage` with source rectangle, or CSS `object-view-box`/clip). Media Library mosaic, Image Comparison, color analysis and screenshots all use the same box.
+- **How the box is computed** (`scripts/detect_print_area.py`, numpy only, no model; method `detect_print_area-v1`):
+  1. Color chart: lines (rows/columns) near an edge where at least 12 % of the pixels are strongly saturated and belong to at least three different hues (chart patches). Photochroms are far less saturated. A chart strip must start in the outer 30 % and be contiguous; colorful areas deeper inside the print (blue lakes, gilded interiors) are not taken for a chart. The strip is cut off, together with an adjacent neutral gray label band.
+  2. Background: the border color of the remaining area is taken as background; dark neutral pixels count as background too. Rows/columns with less than 35 % content are trimmed from the outside. A background gap in the outer 30 % separates further strips (gray scales, labels) from the print.
+  3. Edge refinement (idea: Samuel): the paper edge of the print is a long straight edge. Each side is moved outwards to the outermost line with a continuous strong edge, if the area between is textured and everything beyond it is background. This repairs boxes that stopped inside dark parts of the print.
+  4. Fallback: if trimming leaves less than half of the area, only the chart cut is used (minus 2 % margin), marked "check".
+- **Quality** (fresh test sample of 100 scans with chart, `--seed 2026 --limit 100`): 89 boxes fit well, 6 keep part of the chart (mostly the label band of charts below the print), 5 cut off too much of the print. Further threshold tuning made things worse. Next ideas: template matching of the known Kodak patch sequence, corner detection. All boxes are machine-generated and unreviewed.
+- **Status:** the full run (4,893 scans) and the new embeddings are computed on the Mac (loan from 14.11.2026, see workspace MOC).
+- **Embeddings:** the SigLIP 2 embeddings in `data/zenodo/embeddings-siglip2/` were computed **from the full scans, with the charts**. The chart dominates similarity (95 % of the 10 nearest neighbors share the chart status, chance level 50 %; genre: 77 %). They must be recomputed from the print area before "image similarity" in Pair Matching is reliable.
 
 ## Project Structure & How-Tos (for contributors/agents)
 
