@@ -27,6 +27,7 @@ or `images-legacy-2k.zip`). The images are not in this repo.
 | `data/zenodo/photochrom-main-place.csv` | 4,224 | `identifier_swisscollections` | main motif per legacy record (partial) |
 | `data/zenodo/embeddings-siglip2/embeddings.npy` | 9,582 × 1152, float32 | row number | SigLIP 2 image vectors for similarity and free-text search |
 | `data/zenodo/embeddings-siglip2/dateien.csv` | 9,582 | `zeile` (= row), `image_filename` | maps each vector row to an image |
+| `data/catalog.json` | 9,604 | `id` (MMS ID) | **derived**: compact join of the files above for the web app, built by `scripts/build_catalog.py`; field list and provenance in its `fields` block. Records starting after 1914 are excluded (6, listed in its `excluded` block): photochrom production ended 1914 |
 | `data/artwork-pairs.csv` | 240 | `mms_id` | **photochroms that reproduce paintings, matched to the original artwork** (see below) |
 
 ## Links between files
@@ -66,6 +67,18 @@ Important columns:
 
 Most frequent collections: Museo del Prado (53), Louvre (30), Dresden (19), Kunsthistorisches
 Museum Vienna (13), Musée d'Orsay (9).
+
+## Thumbnails (IIIF level 0)
+
+`scripts/build_thumbs_iiif.py` builds static thumbnails for all records from the preview ZIPs
+(`images-legacy-preview.zip`, `images-recatalogued-preview.zip`): per image an `info.json`
+(IIIF Image API 2.1, level 0) and one 300 px wide JPEG at `iiif/<img>/full/300,/0/default.jpg`.
+The identifier is the catalog field `img` (image file name without extension). 9,591 images,
+19,182 files, about 166 MB. They are published as a separate repository,
+https://github.com/eliaskreyenbuehl/photochrom-images, served at
+`https://eliaskreyenbuehl.github.io/photochrom-images/iiif` (`THUMB_IIIF_BASE` in `js/lib/catalog.js`). For local testing use
+`?thumbs=<url>` (e.g. `?thumbs=http://127.0.0.1:8766/iiif` with `python -m http.server 8766`
+in the thumbnails folder).
 
 ## Traps
 
