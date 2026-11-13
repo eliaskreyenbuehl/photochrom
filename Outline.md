@@ -1,5 +1,13 @@
 # Outline - Photochrom Comparison Tool
 
+Goal of this project: Goal: Creating a research environment for arthistory.
+From close reading images to distant reading, crafting research questions, finding answers by tagging and comparing subsets
+Image inspection in the smallest detail, revealing the secrets of their fabrication
+Color analysis and comparison of two images
+Comparison of image pairs
+
+
+
 ## Project setup
 
 Each feature is implemented in a separate feature branch. The main branch is always deployable and contains the latest stable version.
@@ -23,10 +31,27 @@ The site consists of 3 tabs:
 
 ### Pair matching Tab
 
-- **Use metadata** to match images to pairs
-- **Use image similarity** to match images
-- **Display pairs as gallery** and add option to open in comparison tab
-- **Allow for running custom scripts** on the image data (LLM could produce that script based on user prompt)
+Comparing images side by side is one of the key methods in art history. This tab creates candidate pairs for the Image Comparison tab.
+
+The left image is always a main image from the Photochrom collection. The right image can be:
+
+- another image from the same collection that is related to the main image in some way
+- an image from another collection, a museum, Wikimedia Commons or any other web resource
+- an image uploaded by the user
+
+Candidates are found through the following features:
+
+- **Wikidata match**: both images are linked to the same Wikidata entity
+- **Metadata and image content**: matching metadata fields and depicted content (e.g. sky, boat, snowy mountain peaks)
+- **Image similarity**: visual similarity of the images (e.g. image embeddings)
+- **Color relation**: some kind of color relation, to be defined in the image analysis section
+- **User annotations**: tags that users create themselves in the Image Comparison tab
+- **Skill and MCP** *(future development, not possible on a static site)*: the user tells Claude what they want to compare, and Claude enriches the data if needed
+
+Output and extensions:
+
+- **Display pairs as gallery** with an option to open a pair in the Image Comparison tab
+- **Allow for running custom scripts** on the image data (an LLM could produce the script from a user prompt)
 
 ### Image Comparison Tab
 
