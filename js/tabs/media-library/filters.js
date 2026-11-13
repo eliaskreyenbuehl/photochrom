@@ -27,12 +27,15 @@ export function isEmpty(f) {
   return !f.years && !f.exactOnly && !f.query && GROUPS.every((g) => f[g].size === 0);
 }
 
-const exact = (r) => r.y0 != null && r.y0 === r.y1 && r.df !== 'suspect';
+/** Usable for the date filter: dated within 1889–1914 (open or capped ends are set to 1914). */
+export const datable = (r) => r.y0 != null && r.df !== 'suspect' && r.df !== 'outside';
+/** Dated to a single year, without any correction. */
+export const exactlyDated = (r) => datable(r) && !r.df && r.y0 === r.y1;
 
 function matchYears(r, f) {
-  if (f.exactOnly && !exact(r)) return false;
+  if (f.exactOnly && !exactlyDated(r)) return false;
   if (!f.years) return true;
-  if (r.y0 == null || r.df === 'suspect') return false;
+  if (!datable(r)) return false;
   return r.y0 <= f.years[1] && r.y1 >= f.years[0];
 }
 

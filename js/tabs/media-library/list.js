@@ -123,6 +123,8 @@ export function createList(container, { genres, onOpen }) {
         box.closest('.ml-row').classList.toggle('selected', box.checked);
       }
     },
+    /** Called when the view becomes visible (sizes were 0 while hidden). */
+    show() { render(true); },
     get rows() { return rows; },
   };
 }

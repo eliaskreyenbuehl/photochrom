@@ -45,22 +45,42 @@
 .ml-card-head { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; justify-content: space-between; }
 .ml-card h3 { margin: 0; font-size: 1rem; }
 
-/* timeline */
-.ml-year-inputs { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; align-items: center; font-size: 0.85rem; }
-.ml-year-inputs input[type=number] {
-  width: 5.2rem; padding: 0.2rem 0.3rem; font: inherit; border: 1px solid var(--border); border-radius: 4px;
+/* date filter (compact: histogram, two-handle slider, START/END fields) */
+.ml-date { max-width: 380px; }
+.df-hist { display: block; width: 100%; height: 24px; }
+.df-hist .exact { fill: var(--bar); }
+.df-hist .span { fill: var(--span); opacity: 0.55; }
+.df-hist .out rect { opacity: 0.2; }
+.df-slider { position: relative; height: 18px; margin: 2px 0 4px; }
+.df-track { position: absolute; left: 7px; right: 7px; top: 8px; height: 2px; background: var(--border); }
+.df-fill { position: absolute; top: 0; bottom: 0; background: var(--fg); }
+.df-slider input[type=range] {
+  position: absolute; left: 0; top: 0; width: 100%; height: 18px; margin: 0;
+  background: none; pointer-events: none; -webkit-appearance: none; appearance: none;
 }
-.ml-check { display: inline-flex; gap: 0.3rem; align-items: center; }
-.ml-timeline-chart { margin-top: 0.5rem; }
-.ml-timeline-svg { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: none; user-select: none; }
-.ml-timeline-svg .bar { fill: var(--bar); }
-.ml-timeline-svg .span { fill: var(--span); }
-.ml-timeline-svg .out { opacity: 0.25; }
-.ml-timeline-svg .span.dim { opacity: 0.15; }
-.ml-timeline-svg .brush { fill: var(--accent-soft); }
-.ml-timeline-svg .axis { stroke: var(--muted); stroke-width: 1; }
-.ml-timeline-svg .grid { stroke: var(--border); stroke-dasharray: 3 3; }
-.ml-timeline-svg .tick, .ml-timeline-svg .lane-label { fill: var(--muted); font-size: 11px; }
+.df-slider input[type=range]::-webkit-slider-runnable-track { background: none; height: 18px; }
+.df-slider input[type=range]::-moz-range-track { background: none; }
+.df-slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: pointer;
+  width: 14px; height: 14px; margin-top: 2px; border-radius: 50%;
+  background: #fff; border: 1.5px solid var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.df-slider input[type=range]::-moz-range-thumb {
+  pointer-events: auto; cursor: pointer; width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; border: 1.5px solid var(--fg);
+}
+.df-slider input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+.df-slider input[type=range]:focus-visible::-moz-range-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+.df-fields { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+.df-fields label:not(.df-exact) { display: flex; flex-direction: column; gap: 0.15rem; }
+.df-fields label:last-child { align-items: flex-end; }
+.df-fields span { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.df-fields input[type=number] {
+  width: 4.6rem; padding: 0.15rem 0.3rem; font: inherit; font-size: 0.85rem; text-align: center;
+  border: 1px solid var(--border); border-radius: 3px; background: var(--card);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+.df-exact { display: inline-flex; gap: 0.3rem; align-items: center; font-size: 0.78rem; color: var(--muted); padding-bottom: 0.2rem; }
 
 /* filter pills */
 .ml-filters { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -80,8 +100,41 @@
 .pill:focus-visible, .ml-row:focus-visible, .link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ml-filters [data-reset] { align-self: flex-start; }
 
-/* work list */
-.ml-list { padding: 0; overflow: hidden; }
+/* works: view toggle, mosaic, list */
+.ml-works { padding: 0; overflow: hidden; }
+.ml-works-head { display: flex; justify-content: flex-end; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+.ml-view-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.ml-view-toggle button {
+  border: none; background: var(--card); padding: 0.3rem 0.9rem; font: inherit; font-size: 0.85rem; cursor: pointer; color: var(--muted);
+}
+.ml-view-toggle button + button { border-left: 1px solid var(--border); }
+.ml-view-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.ml-view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.ml-mosaic-note { margin: 0; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: var(--muted); background: #faf9f6; border-bottom: 1px solid var(--border); }
+.ml-mosaic-scroll { position: relative; height: max(380px, calc(100vh - 220px)); overflow-y: auto; overflow-x: hidden; padding: 6px; }
+.ml-mosaic-spacer { position: relative; }
+.ml-tile {
+  position: absolute; overflow: hidden; border-radius: 3px; cursor: pointer; background: #e9e6df;
+}
+.ml-tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s; }
+.ml-tile:hover img { transform: scale(1.03); }
+.ml-tile.selected { outline: 3px solid var(--accent); outline-offset: -3px; }
+.ml-tile:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.ml-tile-check {
+  position: absolute; top: 6px; left: 6px; display: flex; padding: 3px; border-radius: 4px;
+  background: rgba(255,255,255,0.85); opacity: 0; transition: opacity 0.15s;
+}
+.ml-tile:hover .ml-tile-check, .ml-tile:focus-within .ml-tile-check, .ml-tile.selected .ml-tile-check { opacity: 1; }
+.ml-tile-check input { width: 1.05rem; height: 1.05rem; margin: 0; cursor: pointer; }
+.ml-tile-caption {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 1.2rem 0.5rem 0.35rem;
+  font-size: 0.75rem; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity 0.15s;
+}
+.ml-tile:hover .ml-tile-caption, .ml-tile:focus-visible .ml-tile-caption { opacity: 1; }
+@media (hover: none) { .ml-tile-check { opacity: 1; } }
+
 .ml-list-head, .ml-row {
   display: grid; align-items: center; gap: 0.75rem;
   grid-template-columns: 2rem 56px minmax(0, 1fr) 7.5rem minmax(0, 13rem) 9rem 8.5rem;

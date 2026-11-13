@@ -1,21 +1,23 @@
-// Media Library tab: timeline, filter pills and the work list of the whole collection.
+// Media Library tab: filters (date, pills, search) and the whole collection as mosaic or list.
 // Checked rows become main images (left side) for the Pair Matching tab.
 // Sub-modules live in js/tabs/media-library/.
 
-import { loadCatalog } from '../lib/catalog.js';
+import { hasImage, loadCatalog } from '../lib/catalog.js';
 import { showTab } from '../main.js';
 import {
   addToSelection, clearSelection, getSelection, onSelectionChange, removeFromSelection,
 } from '../state.js';
+import { createDateFilter } from './media-library/date-filter.js';
 import { createDetails } from './media-library/details.js';
 import { exportCsv, exportJson, importFile } from './media-library/exchange.js';
 import {
   GROUPS, SOURCES, emptyFilters, facetCounts, isEmpty, matches,
 } from './media-library/filters.js';
 import { createList } from './media-library/list.js';
-import { createTimeline } from './media-library/timeline.js';
+import { createMosaic } from './media-library/mosaic.js';
 
 const COUNTRIES_SHOWN = 12;
+const VIEW_KEY = 'photochrom.libraryView';
 const fmt = (n) => n.toLocaleString('en-US');
 
 const GROUP_LABELS = {
@@ -36,21 +38,11 @@ function render(container) {
         </label>
       </div>
 
-      <section class="ml-card ml-timeline" aria-label="Timeline">
-        <div class="ml-card-head">
-          <h3>Timeline</h3>
-          <div class="ml-year-inputs">
-            <label>From <input type="number" name="from" inputmode="numeric"></label>
-            <label>to <input type="number" name="to" inputmode="numeric"></label>
-            <label class="ml-check"><input type="checkbox" name="exact"> Exact dates only</label>
-            <button type="button" class="link-btn" data-clear-years hidden>Clear years</button>
-          </div>
-        </div>
-        <div class="ml-timeline-chart"></div>
-        <p class="hint">Drag across the chart to select years. Bars: records dated to a single year. Lane below: records dated only as a span. A record matches if its span overlaps the selected years.</p>
-      </section>
-
       <section class="ml-card ml-filters" aria-label="Filters">
+        <div class="ml-group ml-group-date">
+          <span class="ml-group-label">Date<small>1889–1914</small></span>
+          <div class="ml-date"></div>
+        </div>
         ${GROUPS.map((g) => `
           <div class="ml-group" data-group="${g}">
             <span class="ml-group-label">${GROUP_LABELS[g]}${GROUP_NOTES[g] ? `<small>${GROUP_NOTES[g]}</small>` : ''}</span>
@@ -59,7 +51,16 @@ function render(container) {
         <button type="button" class="link-btn" data-reset hidden>Reset all filters</button>
       </section>
 
-      <section class="ml-card ml-list" aria-label="Works"></section>
+      <section class="ml-card ml-works" aria-label="Works">
+        <div class="ml-works-head">
+          <div class="ml-view-toggle" role="group" aria-label="View">
+            <button type="button" data-view="mosaic" aria-pressed="true">Mosaic</button>
+            <button type="button" data-view="list" aria-pressed="false">List</button>
+          </div>
+        </div>
+        <div class="ml-mosaic" data-pane="mosaic"></div>
+        <div class="ml-list" data-pane="list" hidden></div>
+      </section>
 
       <div class="ml-selbar" role="region" aria-label="Selection">
         <span class="ml-selcount"></span>
@@ -90,12 +91,29 @@ function init(container, catalog) {
   const f = emptyFilters();
   const $ = (sel) => container.querySelector(sel);
 
-  const timeline = createTimeline($('.ml-timeline-chart'), {
+  const dateFilter = createDateFilter($('.ml-date'), {
     domain: catalog.years,
-    onBrush(range) { f.years = range; apply(); },
+    onChange({ years, exactOnly }) { f.years = years; f.exactOnly = exactOnly; apply(); },
   });
   const details = createDetails(container.querySelector('.ml'), catalog);
-  const list = createList($('.ml-list'), { genres: catalog.genres, onOpen: (r) => details.open(r) });
+  const open = (r) => details.open(r);
+  const list = createList($('.ml-list'), { genres: catalog.genres, onOpen: open });
+  const mosaic = createMosaic($('.ml-mosaic'), { onOpen: open });
+
+  // --- view toggle (remembered per browser) ---
+  let view = 'mosaic';
+  try { if (localStorage.getItem(VIEW_KEY) === 'list') view = 'list'; } catch { /* no storage */ }
+  function setView(v) {
+    view = v;
+    for (const btn of container.querySelectorAll('[data-view]')) btn.setAttribute('aria-pressed', String(btn.dataset.view === v));
+    for (const pane of container.querySelectorAll('[data-pane]')) pane.hidden = pane.dataset.pane !== v;
+    (v === 'mosaic' ? mosaic : list).show();
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* no storage */ }
+  }
+  $('.ml-view-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-view]');
+    if (btn) setView(btn.dataset.view);
+  });
 
   // --- search ---
   const search = $('.ml-search input');
@@ -106,31 +124,12 @@ function init(container, catalog) {
     searchTimer = setTimeout(() => { f.query = search.value.trim(); apply(); }, 150);
   });
 
-  // --- year inputs ---
-  const from = $('[name=from]');
-  const to = $('[name=to]');
-  const [minYear, maxYear] = catalog.years;
-  for (const input of [from, to]) {
-    input.min = minYear;
-    input.max = maxYear;
-    input.placeholder = input === from ? minYear : maxYear;
-    input.addEventListener('change', () => {
-      const a = Number(from.value) || minYear;
-      const b = Number(to.value) || maxYear;
-      f.years = from.value || to.value ? [Math.min(a, b), Math.max(a, b)] : null;
-      apply();
-    });
-  }
-  $('[name=exact]').addEventListener('change', (e) => { f.exactOnly = e.target.checked; apply(); });
-  $('[data-clear-years]').addEventListener('click', () => { f.years = null; apply(); });
-
   // --- pills ---
   let countriesExpanded = false;
   $('.ml-filters').addEventListener('click', (e) => {
     if (e.target.closest('[data-reset]')) {
       Object.assign(f, emptyFilters());
       search.value = '';
-      $('[name=exact]').checked = false;
       apply();
       return;
     }
@@ -177,19 +176,17 @@ function init(container, catalog) {
   let shownRecords = records;
   function apply() {
     shownRecords = records.filter((r) => matches(r, f));
-    timeline.update(records.filter((r) => matches(r, f, 'years')), f);
+    dateFilter.update(records.filter((r) => matches(r, f, 'years')), f);
 
     const counts = facetCounts(records, f);
     for (const g of GROUPS) {
       container.querySelector(`[data-group="${g}"] .ml-pills`).innerHTML = pillsFor(g, counts[g]);
     }
-    from.value = f.years ? f.years[0] : '';
-    to.value = f.years ? f.years[1] : '';
-    $('[data-clear-years]').hidden = !f.years;
     $('[data-reset]').hidden = isEmpty(f);
 
     list.update(shownRecords);
-    const withImage = shownRecords.filter((r) => r.iiif).length;
+    mosaic.update(shownRecords);
+    const withImage = shownRecords.filter(hasImage).length;
     $('.ml-summary').innerHTML = `<strong>${fmt(shownRecords.length)}</strong> of ${fmt(records.length)} works`
       + ` · ${fmt(withImage)} with online image`;
     updateSelbar();
@@ -246,11 +243,13 @@ function init(container, catalog) {
 
   onSelectionChange((ids) => {
     list.refresh();
+    mosaic.refresh();
     details.refresh();
     updateSelbar(ids);
   });
 
   apply();
+  setView(view);
 }
 
 export default {

@@ -126,16 +126,30 @@ def parse_years(value):
     return y0, int(m.group(2) or y0)
 
 
+# Date axis of the app: 1889-1914, the production period of the photochroms in this
+# collection (decision of the project team with the ZB metadata specialists).
+FIRST_YEAR, LAST_YEAR = 1889, 1914
+
+
 def date_flag(y0, y1):
-    """'open' for an open end ('nach 1914' is catalogued as 1914/9999),
-    'suspect' for dates that are probably typos in the catalogue
-    (e.g. 1804/1896, 1814/1889, 1891/1941). Neither is corrected here."""
+    """Classifies a catalogued date range. The catalogued text stays unchanged in "d".
+
+    'suspect' probably a typo in the catalogue (e.g. 1804/1896, 1814/1889, 1891/1941),
+              left uncorrected and outside the date filter
+    'open'    open end ('nach 1905' is catalogued as 1905/9999), end set to 1914
+    'outside' starts after 1914, outside the production period, outside the date filter
+    'capped'  ends after 1914, end set to 1914
+    """
     if y0 is None:
         return None
     if y1 == 9999:
-        return "open"
-    if y0 < 1880 or y1 - y0 > 40:
+        return "open" if y0 <= LAST_YEAR else "outside"
+    if y0 < FIRST_YEAR or y1 - y0 > 40:
         return "suspect"
+    if y0 > LAST_YEAR:
+        return "outside"
+    if y1 > LAST_YEAR:
+        return "capped"
     return None
 
 
@@ -158,7 +172,9 @@ def main():
             undated.append(mms)
         elif flag:
             flagged.append((mms, r["date_of_publication_or_production"], flag))
-        if flag == "open":
+        if flag in ("open", "capped"):
+            y1 = LAST_YEAR
+        elif flag == "outside" and y1 == 9999:
             y1 = y0
 
         countries, labels = [], []
@@ -210,21 +226,22 @@ def main():
             rec["art"] = pairs[mms]
         records.append(rec)
 
-    dated = [r for r in records if r["y0"] and r.get("df") != "suspect"]
-    years = [r["y0"] for r in dated] + [r["y1"] for r in dated]
     catalog = {
         "source": "Photochrom Collection of the Zentralbibliothek Zürich, Zenodo v1.1, "
                   "https://doi.org/10.5281/zenodo.24141227 (metadata CC0)",
         "built": date.today().isoformat(),
-        "years": [min(years), max(years)],
+        "years": [FIRST_YEAR, LAST_YEAR],
         "genres": GENRES,
         "features": [[k, FEATURES[k]] for k in feature_keys],
         "fields": {
             "id": "MMS ID (identifier_swisscollections)",
             "t": "title", "d": "date as catalogued",
             "y0/y1": "first/last year from date_of_publication_or_production_standardised; null if not parseable",
-            "df": "date flag: 'open' = open end ('after y0', catalogued as y0/9999, y1 set to y0); "
-                  "'suspect' = probably a typo in the catalogue, left uncorrected and outside the timeline axis",
+            "df": "date flag, see date_flag() in scripts/build_catalog.py. Production period 1889-1914 "
+                  "(ZB metadata specialists): 'open' = open end (y0/9999), y1 set to 1914; "
+                  "'capped' = ends after 1914, y1 set to 1914; 'outside' = starts after 1914; "
+                  "'suspect' = probably a typo in the catalogue. 'outside' and 'suspect' are left "
+                  "uncorrected and excluded by the date filter. The catalogued date is always in 'd'.",
             "s": "subset: r = recatalogued (IIIF), l = legacy (no IIIF)",
             "g": "genre, machine-generated (photochrom-image-content.csv, unreviewed)",
             "c": "present-day countries derived from GND area codes of all place mentions "
@@ -234,7 +251,7 @@ def main():
             "ll": "primary coordinates [lat, lon]",
             "iiif": "IIIF Image API base URL of the first image (recatalogued only)",
             "man": "IIIF manifest URL", "doi": "DOI",
-            "img": "image file name without extension (Zenodo image ZIPs)",
+            "img": "image file name without extension (Zenodo image ZIPs); also the identifier on the thumbnail IIIF service",
             "desc": "short image description, machine-generated, unreviewed",
             "art": "match_status in artwork-pairs.csv (record reproduces a painting)",
         },

@@ -1,6 +1,6 @@
 // Detail panel for one record (opens on the right, or full width on small screens).
 
-import { dateLabel, doiUrl, escapeHtml, imageUrl, recordUrl } from '../../lib/catalog.js';
+import { dateLabel, doiUrl, escapeHtml, largeImageUrl, recordUrl } from '../../lib/catalog.js';
 import { isSelected, setSelected } from '../../state.js';
 
 export function createDetails(container, catalog) {
@@ -29,7 +29,7 @@ export function createDetails(container, catalog) {
 
   function open(rec) {
     current = rec;
-    const img = imageUrl(rec, 600);
+    const img = largeImageUrl(rec, 600);
     const features = catalog.features
       .filter((_, i) => rec.f & (1 << i))
       .map(([, label]) => `<li>${escapeHtml(label)}</li>`).join('');
@@ -39,11 +39,13 @@ export function createDetails(container, catalog) {
       rec.man ? `<a href="${escapeHtml(rec.man)}" target="_blank" rel="noopener">IIIF manifest</a>` : '',
       rec.ll ? `<a href="https://www.openstreetmap.org/?mlat=${rec.ll[0]}&mlon=${rec.ll[1]}#map=12/${rec.ll[0]}/${rec.ll[1]}" target="_blank" rel="noopener">Map</a>` : '',
     ].filter(Boolean).join(' · ');
-    const dateNote = rec.df === 'open'
-      ? '<p class="note">Open-ended date in the catalog (“after”).</p>'
-      : rec.df === 'suspect'
-        ? '<p class="note">This date looks like a typo in the catalog record. It is shown as catalogued and left out of the timeline.</p>'
-        : '';
+    const DATE_NOTES = {
+      open: 'Open-ended date in the catalog (“after”). Photochroms were produced until 1914, so the range ends there.',
+      capped: 'The catalog date ends after 1914. Photochroms were produced until 1914, so the range is cut at 1914 (*).',
+      outside: 'The catalog date lies after 1914, outside the production period of the photochroms. Left as catalogued and excluded by the date filter.',
+      suspect: 'This date looks like a typo in the catalog record. Shown as catalogued and excluded by the date filter.',
+    };
+    const dateNote = DATE_NOTES[rec.df] ? `<p class="note">${DATE_NOTES[rec.df]}</p>` : '';
 
     panel.innerHTML = `
       <div class="ml-details-head">
@@ -52,7 +54,7 @@ export function createDetails(container, catalog) {
       </div>
       ${img
         ? `<a class="ml-details-img" href="${rec.iiif ? `${rec.iiif}/full/full/0/default.jpg` : img}" title="Open full resolution" target="_blank" rel="noopener"><img src="${img}" alt="${escapeHtml(rec.desc || rec.t)}"></a>`
-        : '<div class="ml-details-noimg">No online image yet (legacy record).</div>'}
+        : '<div class="ml-details-noimg">No online image yet.</div>'}
       <label class="ml-select-main"><input type="checkbox" data-select ${isSelected(rec.id) ? 'checked' : ''}> Use as main image for pairing</label>
       <dl>
         <dt>Date</dt><dd>${escapeHtml(dateLabel(rec))}${rec.d && rec.d !== dateLabel(rec) ? ` <span class="muted">(catalog: ${escapeHtml(rec.d)})</span>` : ''}</dd>
