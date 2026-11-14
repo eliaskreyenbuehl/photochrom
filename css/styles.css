@@ -249,6 +249,10 @@ input:disabled { color: var(--muted); }
   color: var(--muted);
 }
 
+/* Caption with an "i" button next to it (the caption is a <label for>, the button stays outside it). */
+.control-label { display: inline-flex; align-items: center; gap: 0.25rem; }
+.control-label .info-btn { margin-block: -0.25rem; } /* keep the caption as high as the others */
+
 /* Label to the left of its field, on one line. */
 .control-inline { flex-direction: row; align-items: center; gap: 0.5rem; }
 
@@ -1167,7 +1171,6 @@ input:disabled { color: var(--muted); }
   gap: 1rem 1.5rem;
 }
 
-#panel-comparison .analysis-description,
 #panel-comparison .analysis-note {
   margin: 0.75rem 0 0;
   max-width: 70ch;

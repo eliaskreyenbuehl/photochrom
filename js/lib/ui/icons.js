@@ -9,6 +9,7 @@ const PATHS = {
   mosaic: 'M2 2.5h5v6H2zM9 2.5h5v3.5H9zM2 10.5h5v3H2zM9 8h5v5.5H9z',
   list: 'M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5M2 4h.01M2 8h.01M2 12h.01',
   filter: 'M2 4h12M4.5 8h7M7 12h2',
+  map: 'M3.5 11.5h.01M5.5 8.5h.01M3 6h.01M7 12.5h.01M10 3.5h.01M12.5 5h.01M11 7.5h.01M13 9.5h.01M9.5 11h.01',
   side: 'M1.5 3h5.5v10H1.5zM9 3h5.5v10H9z',
   overlay: 'M1.5 2.5h9v7.5h-9zM5.5 6h9v7.5h-9z',
   slider: 'M1.5 3h13v10h-13zM8 1.5v13M5.5 8H3.5M10.5 8h2',
