@@ -17,6 +17,7 @@ _(in progress)_
 photochrom/
 ├── README.md
 ├── Outline.md                       concept, requirements and how-tos for contributors (start here to develop)
+├── CLAUDE.md                        short working rules for Claude Code (points to Outline.md)
 ├── LICENSE                          MIT, for the code
 ├── index.html                       the web app: page shell with tab bar (static site, GitHub Pages)
 ├── css/
