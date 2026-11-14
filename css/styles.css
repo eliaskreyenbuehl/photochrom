@@ -36,8 +36,15 @@ body {
   color: var(--fg);
 }
 
+/* The header (tab bar) stays at the top while scrolling; its height is --app-header-h (main.js). */
+html { scroll-padding-top: var(--app-header-h, 0px); } /* anchors and focus land below it */
+
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   padding: 1rem 1.5rem 0;
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 
@@ -238,8 +245,8 @@ body {
 
 #panel-comparison .cmp-sidebar {
   position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+  top: calc(var(--app-header-h, 0px) + 1rem);
+  max-height: calc(100vh - var(--app-header-h, 0px) - 2rem);
   overflow-y: auto;
 }
 
