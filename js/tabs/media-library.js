@@ -1,5 +1,5 @@
 // Media Library tab: filters (date, pills, search) and the whole collection as mosaic or list.
-// Checked rows become main images (left side) for the Pair Matching tab.
+// Checked rows become main images (left side) for the Candidates tab.
 // Sub-modules live in js/tabs/media-library/.
 
 import { hasImage, loadCatalog } from '../lib/catalog.js';
@@ -73,7 +73,7 @@ function render(container) {
         <input type="file" accept=".json,.csv,.txt" hidden>
         <button type="button" data-act="clear">Clear</button>
         <span class="ml-selmsg" aria-live="polite"></span>
-        <button type="button" class="primary" data-act="to-pairing">Open in Pair Matching →</button>
+        <button type="button" class="primary" data-act="to-pairing">Open in Candidates →</button>
       </div>
     </div>
   `;
