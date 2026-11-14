@@ -1,4 +1,4 @@
-// Pair Matching tab
+// Candidates tab (id 'pair-matching', kept for links and the URL hash #pair-matching)
 // First step: shows the main images (left side) selected in the Media Library.
 // Planned: find partner images via Wikidata, metadata and image content, image similarity,
 // color relation and user annotations (see Outline.md), show pairs as a gallery and open
@@ -13,7 +13,7 @@ async function draw() {
   const ids = getSelection();
   if (!ids.length) {
     container.innerHTML = `
-      <h2>Pair Matching</h2>
+      <h2>Candidates</h2>
       <p class="placeholder">No main images selected yet. Check works in the Media Library to use them as the left image of a pair.</p>`;
     return;
   }
@@ -34,7 +34,7 @@ async function draw() {
       </li>`;
   }).join('');
   container.innerHTML = `
-    <h2>Pair Matching</h2>
+    <h2>Candidates</h2>
     <p>${ids.length.toLocaleString('en-US')} main image${ids.length === 1 ? '' : 's'} (left side). Finding partner images comes next.</p>
     <ul class="pm-grid">${cards}</ul>
     ${ids.length > LIMIT ? `<p class="muted">Showing the first ${LIMIT}.</p>` : ''}`;
@@ -42,7 +42,7 @@ async function draw() {
 
 export default {
   id: 'pair-matching',
-  label: 'Pair Matching',
+  label: 'Candidates',
 
   render(el) {
     container = el;

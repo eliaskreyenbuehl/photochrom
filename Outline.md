@@ -33,13 +33,13 @@ The start page: the whole collection (9,604 records) as filters and an image mos
 - **Date rules** (`scripts/build_catalog.py`): photochrom production ended 1914, so records starting after 1914 are excluded from the catalog (6 records). Ranges ending after 1914 are cut at 1914 (flag `capped`), open ends ("after 1905") end at 1914 (flag `open`). Probable typos in catalog dates are flagged `suspect`, not corrected, and excluded by the date filter. The catalogued date is always shown as well.
 - **Filter pills**: genre, country, image content, source (with IIIF image, reproduces a painting). OR within a group, AND between groups; each pill shows its count given the other filters. Free-text search over title, place, country and MMS ID.
 - **Views**: *Mosaic* (default) shows the filtered works as uniform image tiles; *List* shows the work list with sortable columns. Both use virtual scrolling (only visible rows are in the page) and share the selection. Click a tile or row for details.
-- **Selection**: the checkbox on a tile or row makes the work a main image for the Pair Matching tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Kept in the browser only (localStorage), with export (CSV, JSON) and import.
+- **Selection**: the checkbox on a tile or row makes the work a main image for the Candidates tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Kept in the browser only (localStorage), with export (CSV, JSON) and import.
 - **Images**: thumbnails come from an own static IIIF level 0 service, so scrolling does not load hundreds of images from e-rara. Sources and URLs for all sizes: see [Images: sources and URLs](#images-sources-and-urls).
 - **Image analyses over time**: the date histogram is the first step; later e.g. color values over time.
 
 Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` (about 0.9 MB compressed), which all tabs share.
 
-### Pair matching Tab
+### Candidates Tab
 
 Comparing images side by side is one of the key methods in art history. This tab creates candidate pairs for the Image Comparison tab.
 
@@ -65,7 +65,7 @@ Output and extensions:
 
 ### Image Comparison Tab
 
-- **Load 2 images**: two sample pairs, plus 178 photochrom–painting pairs from the catalog (`artwork-pairs.csv`, Wikidata match, unreviewed; painting from Commons via `commons-images.csv`, photochrom via `fullImageUrl()` in zoom quality: e-rara up to 4,000 px, legacy 2K scan from Hugging Face, 300 px thumbnail as fallback). Later also pairs from Pair Matching.
+- **Load 2 images**: two sample pairs, plus 178 photochrom–painting pairs from the catalog (`artwork-pairs.csv`, Wikidata match, unreviewed; painting from Commons via `commons-images.csv`, photochrom via `fullImageUrl()` in zoom quality: e-rara up to 4,000 px, legacy 2K scan from Hugging Face, 300 px thumbnail as fallback). Later also pairs from the Candidates tab.
 - **Crop to print** (default on): photochroms with a box in `print-area.csv` are cropped to the print when loading, so view, alignment, overlap %, differences, color analysis and screenshots never see the color chart. The status line says when an image is cropped; unticking shows the whole scan.
 - **Display images side by side** for comparison
 - **Display image metadata** (loaded via seperate local csv)
@@ -229,10 +229,10 @@ js/tabs/media-library/
   list.js                   virtual-scrolling work list with checkboxes
   details.js                detail panel for one record
   exchange.js               export/import of the selection (CSV, JSON)
-css/media-library.css     styles of the Media Library (and candidate cards in Pair Matching)
+css/media-library.css     styles of the Media Library (and candidate cards in the Candidates tab)
 scripts/build_catalog.py  builds data/catalog.json from the Zenodo CSVs (run after data updates)
 scripts/build_thumbs_iiif.py  builds static IIIF level 0 thumbnails for the photochrom-images repository
-js/tabs/pair-matching.js  Pair Matching tab
+js/tabs/pair-matching.js  Candidates tab (id 'pair-matching')
 .nojekyll                 disables Jekyll processing on GitHub Pages
 ```
 

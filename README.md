@@ -26,7 +26,7 @@ photochrom/
 │   ├── config.js                    default image URLs for the comparison tab
 │   └── tabs/
 │       ├── media-library.js         Media Library tab
-│       ├── pair-matching.js         Pair Matching tab
+│       ├── pair-matching.js         Candidates tab
 │       └── comparison.js            Image Comparison tab
 ├── data/
 │   ├── artwork-pairs.csv            240 photochroms reproducing paintings, matched to the originals (Wikidata, Commons)
