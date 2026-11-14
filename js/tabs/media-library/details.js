@@ -10,6 +10,13 @@ export function createDetails(container, catalog) {
   panel.setAttribute('aria-label', 'Record details');
   container.append(panel);
 
+  // The panel ends above the selection bar at the bottom of the window, so the bar's
+  // buttons stay usable while details are open. The bar's height changes (it wraps).
+  const bar = container.querySelector('.ml-selbar');
+  if (bar) {
+    new ResizeObserver(() => container.style.setProperty('--ml-selbar-h', `${bar.offsetHeight}px`)).observe(bar);
+  }
+
   let current = null;
 
   panel.addEventListener('click', (e) => {
