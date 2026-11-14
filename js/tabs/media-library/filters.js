@@ -1,7 +1,7 @@
 // Filter model of the Media Library (pure logic, no DOM).
 //
-// Within a pill group the values are combined with OR, between groups with AND.
-// Facet counts for a group are computed with all *other* groups applied, so a pill
+// Within a facet group the values are combined with OR, between groups with AND.
+// Facet counts for a group are computed with all *other* groups applied, so a facet
 // shows how many records you get when you add it.
 
 export const GROUPS = ['genre', 'country', 'feature', 'source'];
@@ -74,7 +74,7 @@ export function matches(r, f, skip = null) {
   return true;
 }
 
-/** Counts per pill value, each group computed with the other groups applied. */
+/** Counts per facet value, each group computed with the other groups applied. */
 export function facetCounts(records, f) {
   const counts = { genre: new Map(), country: new Map(), feature: new Map(), source: new Map() };
   const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);

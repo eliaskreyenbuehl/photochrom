@@ -1,12 +1,24 @@
-// Image mosaic of the filtered works. Tiles share one size (4:3, cropped);
-// only the rows in view are in the DOM (virtual scrolling), like list.js.
+// Image mosaic of the filtered works as masonry columns: all columns have the same
+// width, each tile keeps the aspect ratio of its image and goes into the shortest
+// column. Only the tiles in view are in the DOM (virtual scrolling), like list.js.
+//
+// Aspect ratios come from the catalog (field "ar", see scripts/build_image_sizes.py), so
+// tiles are placed before the images load. Where data/print-area.csv has a box, the tile
+// shows only the print, without colour chart and scanner background (box machine-made,
+// unreviewed; the details panel and the list still show the whole scan).
 
 import { escapeHtml, hasImage, imageUrl } from '../../lib/catalog.js';
+import { isCropping } from '../../lib/print-area.js';
 import { isSelected, setSelected } from '../../state.js';
 
-const MIN_TILE = 170;  // px; the column count follows the available width
+const MIN_COL = 190;   // px; the column count follows the available width
 const GAP = 6;
-const OVERSCAN_ROWS = 3;
+const OVERSCAN = 600;  // px rendered above and below the visible part
+const DEFAULT_RATIO = 4 / 3;
+// Very wide or tall images would make tiny or huge tiles; beyond these limits the tile
+// keeps the limit and the image is cropped to fill it.
+const MIN_RATIO = 0.5;
+const MAX_RATIO = 3;
 
 export function createMosaic(container, { onOpen }) {
   container.innerHTML = `
@@ -21,10 +33,11 @@ export function createMosaic(container, { onOpen }) {
   const empty = container.querySelector('.ml-empty');
 
   let items = [];
-  let cols = 1;
-  let tileW = MIN_TILE;
-  let tileH = (MIN_TILE * 3) / 4;
+  let areas = new Map();   // img -> print-area box
+  let pos = [];            // per item: { x, y, h, box, ratio }
+  let colW = MIN_COL;
   let rendered = '';
+  let frame = 0;
 
   spacer.addEventListener('change', (e) => {
     const box = e.target.closest('input[data-id]');
@@ -42,46 +55,82 @@ export function createMosaic(container, { onOpen }) {
       onOpen(items[Number(tile.dataset.i)]);
     }
   });
-  scroll.addEventListener('scroll', () => render(), { passive: true });
-  new ResizeObserver(() => { layout(); render(true); }).observe(scroll);
+  scroll.addEventListener('scroll', () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => render());
+  }, { passive: true });
+  let lastWidth = 0;
+  new ResizeObserver(() => {
+    if (scroll.clientWidth === lastWidth) { render(true); return; }
+    lastWidth = scroll.clientWidth;
+    layout();
+    render(true);
+  }).observe(scroll);
 
+  /** Print-area box of a record, if it really removes something. */
+  function boxOf(r) {
+    const box = r.img ? areas.get(r.img) : null;
+    return isCropping(box) ? box : null;
+  }
+
+  /** Masonry: every tile goes into the currently shortest column. */
   function layout() {
     const style = getComputedStyle(scroll);
     const width = scroll.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     if (!width) return;
-    cols = Math.max(2, Math.floor((width + GAP) / (MIN_TILE + GAP)));
-    tileW = (width - GAP * (cols - 1)) / cols;
-    tileH = Math.round((tileW * 3) / 4);
+    const cols = Math.max(2, Math.floor((width + GAP) / (MIN_COL + GAP)));
+    colW = (width - GAP * (cols - 1)) / cols;
+    const heights = new Array(cols).fill(0);
+    pos = items.map((r) => {
+      const box = boxOf(r);
+      let ratio = r.ar || DEFAULT_RATIO;
+      if (box) ratio *= (box.x1 - box.x0) / (box.y1 - box.y0);
+      const clamped = Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio));
+      let c = 0;
+      for (let k = 1; k < cols; k++) if (heights[k] < heights[c]) c = k;
+      const h = Math.round(colW / clamped);
+      const p = { x: c * (colW + GAP), y: heights[c], h, box, exact: clamped === ratio };
+      heights[c] += h + GAP;
+      return p;
+    });
+    spacer.style.height = `${Math.max(0, Math.max(...heights) - GAP)}px`;
+  }
+
+  /** Image inside the tile: whole image, or shifted and scaled so only the print area shows. */
+  function imgHtml(r, p) {
+    const src = imageUrl(r, 300);
+    if (!p.box || !p.exact) return `<img src="${src}" alt="" loading="lazy" decoding="async">`;
+    const bw = p.box.x1 - p.box.x0;
+    const bh = p.box.y1 - p.box.y0;
+    const style = `width:${(100 / bw).toFixed(3)}%;left:${(-p.box.x0 / bw * 100).toFixed(3)}%;top:${(-p.box.y0 / bh * 100).toFixed(3)}%`;
+    return `<img class="cropped" src="${src}" alt="" loading="lazy" decoding="async" style="${style}">`;
   }
 
   function tileHtml(r, i) {
-    const row = Math.floor(i / cols);
-    const col = i % cols;
+    const p = pos[i];
     const sel = isSelected(r.id);
     const title = escapeHtml(r.t);
     return `
       <div class="ml-tile${sel ? ' selected' : ''}" data-i="${i}" tabindex="0" role="button" aria-label="${title}" title="${title}"
-        style="left:${col * (tileW + GAP)}px;top:${row * (tileH + GAP)}px;width:${tileW}px;height:${tileH}px">
-        <img src="${imageUrl(r, 300)}" alt="" loading="lazy" decoding="async">
+        style="left:${p.x}px;top:${p.y}px;width:${colW}px;height:${p.h}px">
+        ${imgHtml(r, p)}
         <label class="ml-tile-check"><input type="checkbox" data-id="${r.id}" ${sel ? 'checked' : ''}><span class="visually-hidden">Use as main image: ${title}</span></label>
         <span class="ml-tile-caption">${title}</span>
       </div>`;
   }
 
   function render(force = false) {
-    const rows = Math.ceil(items.length / cols);
-    spacer.style.height = `${Math.max(0, rows * (tileH + GAP) - GAP)}px`;
     empty.hidden = items.length > 0;
-    const rowH = tileH + GAP;
-    const firstRow = Math.max(0, Math.floor(scroll.scrollTop / rowH) - OVERSCAN_ROWS);
-    const lastRow = Math.min(rows, Math.ceil((scroll.scrollTop + scroll.clientHeight) / rowH) + OVERSCAN_ROWS);
-    const key = `${firstRow}-${lastRow}-${cols}`;
+    const top = scroll.scrollTop - OVERSCAN;
+    const bottom = scroll.scrollTop + scroll.clientHeight + OVERSCAN;
+    const visible = [];
+    for (let i = 0; i < pos.length; i++) {
+      if (pos[i].y < bottom && pos[i].y + pos[i].h > top) visible.push(i);
+    }
+    const key = `${visible[0]}-${visible[visible.length - 1]}-${visible.length}-${colW}`;
     if (!force && key === rendered) return;
     rendered = key;
-    let html = '';
-    const end = Math.min(items.length, lastRow * cols);
-    for (let i = firstRow * cols; i < end; i++) html += tileHtml(items[i], i);
-    spacer.innerHTML = html;
+    spacer.innerHTML = visible.map((i) => tileHtml(items[i], i)).join('');
   }
 
   return {
@@ -95,13 +144,19 @@ export function createMosaic(container, { onOpen }) {
       layout();
       render(true);
     },
+    /** Print-area boxes (Map img -> box) arrive after the catalog; re-place the tiles. */
+    setPrintAreas(map) {
+      areas = map;
+      layout();
+      render(true);
+    },
     refresh() {
       for (const box of spacer.querySelectorAll('input[data-id]')) {
         box.checked = isSelected(box.dataset.id);
         box.closest('.ml-tile').classList.toggle('selected', box.checked);
       }
     },
-    /** Called when the view becomes visible (sizes were 0 while hidden). */
+    /** Called when the view becomes visible or its width changed (sizes were 0 while hidden). */
     show() { layout(); render(true); },
   };
 }
