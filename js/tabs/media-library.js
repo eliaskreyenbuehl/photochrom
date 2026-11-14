@@ -1,8 +1,10 @@
-// Media Library tab: filters (date, pills, search) and the whole collection as mosaic or list.
+// Media Library tab: toolbar (date, search, view), filter facets in a sidebar and the whole
+// collection as masonry mosaic or list.
 // Checked rows become main images (left side) for the Candidates tab.
 // Sub-modules live in js/tabs/media-library/.
 
-import { hasImage, loadCatalog } from '../lib/catalog.js';
+import { escapeHtml, hasImage, loadCatalog } from '../lib/catalog.js';
+import { loadPrintAreas } from '../lib/print-area.js';
 import { showTab } from '../main.js';
 import {
   addToSelection, clearSelection, getSelection, onSelectionChange, removeFromSelection,
@@ -11,13 +13,13 @@ import { createDateFilter } from './media-library/date-filter.js';
 import { createDetails } from './media-library/details.js';
 import { exportCsv, exportJson, importFile } from './media-library/exchange.js';
 import {
-  GROUPS, SOURCES, emptyFilters, facetCounts, isEmpty, matches,
+  GROUPS, SOURCES, emptyFilters, facetCounts, matches,
 } from './media-library/filters.js';
 import { createList } from './media-library/list.js';
 import { createMosaic } from './media-library/mosaic.js';
 
-const COUNTRIES_SHOWN = 12;
 const VIEW_KEY = 'photochrom.libraryView';
+const FACETS_OPEN_KEY = 'photochrom.libraryFacetsOpen';
 const fmt = (n) => n.toLocaleString('en-US');
 
 const GROUP_LABELS = {
@@ -26,41 +28,50 @@ const GROUP_LABELS = {
 const GROUP_NOTES = {
   genre: 'machine-generated', feature: 'machine-generated, unreviewed',
 };
+// Values shown per group before "Show all"; active values are always shown.
+const GROUP_SHOWN = { genre: 6, country: 8, feature: 8, source: Infinity };
+// Groups that start collapsed (they open by themselves when one of their values is active).
+const GROUP_CLOSED = new Set(['feature']);
 
 function render(container) {
   container.innerHTML = `
     <div class="ml">
-      <div class="ml-top">
+      <div class="ml-toolbar">
+        <button type="button" class="ml-facets-btn" aria-controls="ml-facets" aria-expanded="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filters <span class="ml-facets-n" hidden></span>
+        </button>
         <p class="ml-summary" aria-live="polite">Loading catalog…</p>
+        <div class="ml-date-wrap">
+          <span class="ml-date-label">Date</span>
+          <div class="ml-date"></div>
+        </div>
         <label class="ml-search">
           <span class="visually-hidden">Search title, place, country or MMS ID</span>
           <input type="search" placeholder="Search title, place, country, MMS ID" disabled>
         </label>
+        <div class="ml-view-toggle" role="group" aria-label="View">
+          <button type="button" data-view="mosaic" aria-pressed="true">Mosaic</button>
+          <button type="button" data-view="list" aria-pressed="false">List</button>
+        </div>
       </div>
 
-      <section class="ml-card ml-filters" aria-label="Filters">
-        <div class="ml-group ml-group-date">
-          <span class="ml-group-label">Date<small>1889–1914</small></span>
-          <div class="ml-date"></div>
-        </div>
-        ${GROUPS.map((g) => `
-          <div class="ml-group" data-group="${g}">
-            <span class="ml-group-label">${GROUP_LABELS[g]}${GROUP_NOTES[g] ? `<small>${GROUP_NOTES[g]}</small>` : ''}</span>
-            <div class="ml-pills" role="group" aria-label="${GROUP_LABELS[g]}"></div>
-          </div>`).join('')}
-        <button type="button" class="link-btn" data-reset hidden>Reset all filters</button>
-      </section>
+      <div class="ml-active" role="group" aria-label="Active filters" hidden></div>
 
-      <section class="ml-card ml-works" aria-label="Works">
-        <div class="ml-works-head">
-          <div class="ml-view-toggle" role="group" aria-label="View">
-            <button type="button" data-view="mosaic" aria-pressed="true">Mosaic</button>
-            <button type="button" data-view="list" aria-pressed="false">List</button>
-          </div>
-        </div>
-        <div class="ml-mosaic" data-pane="mosaic"></div>
-        <div class="ml-list" data-pane="list" hidden></div>
-      </section>
+      <div class="ml-body">
+        <aside class="ml-facets" id="ml-facets" aria-label="Filters">
+          ${GROUPS.map((g) => `
+            <details class="ml-facet" data-group="${g}"${GROUP_CLOSED.has(g) ? '' : ' open'}>
+              <summary>${GROUP_LABELS[g]}${GROUP_NOTES[g] ? ` <small>${GROUP_NOTES[g]}</small>` : ''}</summary>
+              <div class="ml-facet-list" role="group" aria-label="${GROUP_LABELS[g]}"></div>
+            </details>`).join('')}
+        </aside>
+
+        <section class="ml-works" aria-label="Works">
+          <div class="ml-mosaic" data-pane="mosaic"></div>
+          <div class="ml-list" data-pane="list" hidden></div>
+        </section>
+      </div>
 
       <div class="ml-selbar" role="region" aria-label="Selection">
         <span class="ml-selcount"></span>
@@ -99,6 +110,9 @@ function init(container, catalog) {
   const open = (r) => details.open(r);
   const list = createList($('.ml-list'), { genres: catalog.genres, onOpen: open });
   const mosaic = createMosaic($('.ml-mosaic'), { onOpen: open });
+  loadPrintAreas()
+    .then((areas) => mosaic.setPrintAreas(areas))
+    .catch((err) => console.warn('No print areas, mosaic shows whole scans:', err));
 
   // --- view toggle (remembered per browser) ---
   let view = 'mosaic';
@@ -115,6 +129,17 @@ function init(container, catalog) {
     if (btn) setView(btn.dataset.view);
   });
 
+  // --- sidebar shown or hidden (remembered per browser) ---
+  const facets = $('.ml-facets');
+  const facetsBtn = $('.ml-facets-btn');
+  function setFacetsOpen(isOpen) {
+    facets.hidden = !isOpen;
+    facetsBtn.setAttribute('aria-expanded', String(isOpen));
+    try { localStorage.setItem(FACETS_OPEN_KEY, isOpen ? '1' : '0'); } catch { /* no storage */ }
+  }
+  facetsBtn.addEventListener('click', () => setFacetsOpen(facets.hidden));
+  try { if (localStorage.getItem(FACETS_OPEN_KEY) === '0') setFacetsOpen(false); } catch { /* no storage */ }
+
   // --- search ---
   const search = $('.ml-search input');
   search.disabled = false;
@@ -124,53 +149,87 @@ function init(container, catalog) {
     searchTimer = setTimeout(() => { f.query = search.value.trim(); apply(); }, 150);
   });
 
-  // --- pills ---
-  let countriesExpanded = false;
-  $('.ml-filters').addEventListener('click', (e) => {
+  // --- facets (checkbox lists in the sidebar) ---
+  const expanded = new Set(); // groups that show all values
+  const valueOf = (group, raw) => (group === 'feature' ? Number(raw) : raw);
+
+  facets.addEventListener('change', (e) => {
+    const box = e.target.closest('input[data-value]');
+    if (!box) return;
+    const group = box.closest('[data-group]').dataset.group;
+    const value = valueOf(group, box.dataset.value);
+    if (box.checked) f[group].add(value); else f[group].delete(value);
+    apply();
+  });
+  facets.addEventListener('click', (e) => {
+    const more = e.target.closest('[data-more]');
+    if (!more) return;
+    const group = more.closest('[data-group]').dataset.group;
+    if (expanded.has(group)) expanded.delete(group); else expanded.add(group);
+    apply();
+  });
+
+  const countries = [...new Set(records.flatMap((r) => r.c))].map((c) => [c, c]);
+  const featureItems = catalog.features.map(([, label], i) => [i, label]);
+  function itemsOf(group) {
+    if (group === 'genre') return Object.entries(catalog.genres);
+    if (group === 'feature') return featureItems;
+    if (group === 'source') return SOURCES;
+    return countries;
+  }
+  const labelOf = (group, value) => itemsOf(group).find(([v]) => v === value)?.[1] ?? String(value);
+
+  function facetHtml(group, counts) {
+    const active = f[group];
+    let items = itemsOf(group);
+    // Most frequent first. A group's counts do not depend on its own values, so the
+    // order stays put while you tick boxes within the group.
+    if (group !== 'source') {
+      items = [...items].sort((a, b) => (counts.get(b[0]) || 0) - (counts.get(a[0]) || 0)
+        || String(a[1]).localeCompare(String(b[1])));
+    }
+    const limit = GROUP_SHOWN[group];
+    const shown = expanded.has(group) ? items : items.filter(([v], i) => i < limit || active.has(v));
+    const html = shown.map(([value, label]) => {
+      const n = counts.get(value) || 0;
+      const on = active.has(value);
+      const off = !n && !on;
+      return `<label class="facet${off ? ' empty' : ''}"><input type="checkbox" data-value="${value}"${on ? ' checked' : ''}${off ? ' disabled' : ''}>`
+        + `<span class="facet-label">${label}</span><span class="n">${fmt(n)}</span></label>`;
+    });
+    if (items.length > limit) {
+      const noun = group === 'country' ? 'countries' : 'values';
+      html.push(`<button type="button" class="link-btn" data-more>${expanded.has(group) ? 'Show fewer' : `Show all ${items.length} ${noun}`}</button>`);
+    }
+    return html.join('');
+  }
+
+  // --- active filters as removable chips ---
+  function activeChips() {
+    const chips = [];
+    if (f.years) chips.push(['years', '', `Date: ${f.years[0]}–${f.years[1]}`]);
+    if (f.exactOnly) chips.push(['exact', '', 'Exact dates only']);
+    for (const g of GROUPS) for (const v of f[g]) chips.push([g, v, `${GROUP_LABELS[g]}: ${labelOf(g, v)}`]);
+    if (f.query) chips.push(['query', '', `Search: “${f.query}”`]);
+    return chips;
+  }
+
+  $('.ml-active').addEventListener('click', (e) => {
     if (e.target.closest('[data-reset]')) {
       Object.assign(f, emptyFilters());
       search.value = '';
       apply();
       return;
     }
-    if (e.target.closest('[data-more]')) {
-      countriesExpanded = !countriesExpanded;
-      apply();
-      return;
-    }
-    const pill = e.target.closest('.pill');
-    if (!pill) return;
-    const set = f[pill.closest('[data-group]').dataset.group];
-    const value = pill.dataset.group === 'feature' ? Number(pill.dataset.value) : pill.dataset.value;
-    if (set.has(value)) set.delete(value); else set.add(value);
+    const chip = e.target.closest('[data-chip]');
+    if (!chip) return;
+    const kind = chip.dataset.chip;
+    if (kind === 'years') f.years = null;
+    else if (kind === 'exact') f.exactOnly = false;
+    else if (kind === 'query') { f.query = ''; search.value = ''; }
+    else f[kind].delete(valueOf(kind, chip.dataset.value));
     apply();
   });
-
-  function pillsFor(group, counts) {
-    let items;
-    if (group === 'genre') items = Object.entries(catalog.genres);
-    else if (group === 'feature') items = catalog.features.map(([, label], i) => [i, label]);
-    else if (group === 'source') items = SOURCES;
-    else {
-      items = [...new Set(records.flatMap((r) => r.c))]
-        .sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0) || a.localeCompare(b))
-        .map((c) => [c, c]);
-    }
-    const active = f[group];
-    let shown = items;
-    if (group === 'country' && !countriesExpanded) {
-      shown = items.filter(([v], i) => i < COUNTRIES_SHOWN || active.has(v));
-    }
-    const html = shown.map(([value, label]) => {
-      const n = counts.get(value) || 0;
-      const on = active.has(value);
-      return `<button type="button" class="pill" data-group="${group}" data-value="${value}" aria-pressed="${on}" ${!n && !on ? 'disabled' : ''}>${label} <span class="n">${fmt(n)}</span></button>`;
-    });
-    if (group === 'country' && items.length > COUNTRIES_SHOWN) {
-      html.push(`<button type="button" class="link-btn" data-more>${countriesExpanded ? 'Fewer' : `All ${items.length} countries`}</button>`);
-    }
-    return html.join('');
-  }
 
   // --- main update ---
   let shownRecords = records;
@@ -180,9 +239,19 @@ function init(container, catalog) {
 
     const counts = facetCounts(records, f);
     for (const g of GROUPS) {
-      container.querySelector(`[data-group="${g}"] .ml-pills`).innerHTML = pillsFor(g, counts[g]);
+      const facet = container.querySelector(`.ml-facet[data-group="${g}"]`);
+      facet.querySelector('.ml-facet-list').innerHTML = facetHtml(g, counts[g]);
+      if (f[g].size) facet.open = true;
     }
-    $('[data-reset]').hidden = isEmpty(f);
+
+    const chips = activeChips();
+    const bar = $('.ml-active');
+    bar.hidden = chips.length === 0;
+    bar.innerHTML = chips.map(([kind, value, label]) => `<button type="button" class="ml-chip" data-chip="${kind}" data-value="${escapeHtml(String(value))}" aria-label="Remove filter ${escapeHtml(label)}">${escapeHtml(label)} <span aria-hidden="true">×</span></button>`).join('')
+      + '<button type="button" class="link-btn" data-reset>Reset all</button>';
+    const n = $('.ml-facets-n');
+    n.hidden = chips.length === 0;
+    n.textContent = chips.length;
 
     list.update(shownRecords);
     mosaic.update(shownRecords);

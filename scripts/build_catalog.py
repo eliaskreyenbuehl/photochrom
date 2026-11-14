@@ -8,7 +8,8 @@ Run from the repository root:
     python scripts/build_catalog.py
 
 Inputs (unchanged): data/zenodo/photochrom-metadata.csv, photochrom-image-content.csv,
-photochrom-places.csv, data/artwork-pairs.csv. Output: data/catalog.json.
+photochrom-places.csv, data/artwork-pairs.csv, data/image-sizes.csv (optional, from
+scripts/build_image_sizes.py). Output: data/catalog.json.
 
 Derived values and their provenance are described in the "fields" block of the output.
 """
@@ -155,6 +156,8 @@ def main():
     meta = read(ZENODO / "photochrom-metadata.csv")
     content = {r["mms_id"]: r for r in read(ZENODO / "photochrom-image-content.csv")}
     pairs = {r["mms_id"]: r["match_status"] for r in read(ROOT / "data" / "artwork-pairs.csv")}
+    sizes_csv = ROOT / "data" / "image-sizes.csv"
+    sizes = {r["img"]: (int(r["width"]), int(r["height"])) for r in read(sizes_csv)} if sizes_csv.exists() else {}
 
     places = {}
     for r in sorted(read(ZENODO / "photochrom-places.csv"), key=lambda r: int(r["place_seq"] or 0)):
@@ -222,6 +225,9 @@ def main():
             rec["n"] = r["photochrom_number"]
         if r["image_files"]:
             rec["img"] = Path(r["image_files"].split(" | ")[0]).stem
+            if rec["img"] in sizes:
+                w, h = sizes[rec["img"]]
+                rec["ar"] = round(w / h, 3)
         if ic.get("beschreibung_en"):
             rec["desc"] = ic["beschreibung_en"]
         if mms in pairs:
@@ -260,6 +266,7 @@ def main():
             "n": "Photochrom number printed on the print (photochrom_number, see docs/data.md; "
                  "rule-based, unreviewed)",
             "img": "image file name without extension (Zenodo image ZIPs); also the identifier on the thumbnail IIIF service",
+            "ar": "aspect ratio (width / height) of the whole scan, from data/image-sizes.csv",
             "desc": "short image description, machine-generated, unreviewed",
             "art": "match_status in artwork-pairs.csv (record reproduces a painting)",
         },
