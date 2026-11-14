@@ -21,7 +21,7 @@ or `images-legacy-2k.zip`). The images are not in this repo.
 
 | File | Rows | Key | Use |
 |---|---|---|---|
-| `data/zenodo/photochrom-metadata.csv` | 9,610 | `identifier_swisscollections` | catalogue data, DOI, `iiif_manifest_url`, `iiif_image_uris`, primary coordinates (`geo_primary_lat/lon`) |
+| `data/zenodo/photochrom-metadata.csv` | 9,610 | `identifier_swisscollections` | catalogue data, DOI, `iiif_manifest_url`, `iiif_image_uris`, primary coordinates (`geo_primary_lat/lon`). **Added column, not in Zenodo v1.1:** `photochrom_number` (see below) |
 | `data/zenodo/photochrom-image-content.csv` | 9,610 | `mms_id` | machine-generated image content: `genre`, people, buildings, mountains, water … as yes/no columns, short English description |
 | `data/zenodo/photochrom-places.csv` | 12,676 | `identifier_swisscollections` | every place mention with GND, Wikidata and coordinates |
 | `data/zenodo/photochrom-main-place.csv` | 4,224 | `identifier_swisscollections` | main motif per legacy record (partial) |
@@ -42,6 +42,24 @@ or `images-legacy-2k.zip`). The images are not in this repo.
   legacy = MARC 993$a (`400013004.jpg`). `image_files` in the metadata gives the path inside the Zenodo ZIPs.
 - IIIF image URL pattern (recatalogued): `https://www.e-rara.ch/i3f/v21/<VLID>/full/,560/0/default.jpg`.
 - Several values in one cell are separated by ` | `.
+
+## photochrom_number
+
+The Photochrom number printed on the print, usually in gold at the lower left (e.g. `"17510.P.Z." -- unten links` in
+`general_note` → `17510`). Digits only; empty when the note records none. Added to
+`photochrom-metadata.csv` and `sample/sample-metadata.csv` as the last column by
+`scripts/add_photochrom_number.py`, 14.11.2026,
+rule-based (regular expressions), machine-made, **unreviewed**. All other cells are unchanged.
+
+- 8,206 records have a number, 1,404 have none.
+- Lengths: 4 digits 3,589, 5 digits 3,794, 3 digits 744, 1–2 digits 69, 6 digits 10. Short numbers
+  are real (early series, many painting reproductions). The 6-digit values (`202010`–`202016`,
+  `104836`, `104837`, `171442`, `818677`) are copied as catalogued and probably misreadings.
+- Numbers of other prints mentioned in the note (“Grösseres Format von 662. P.Z.”, “Photochrom
+  Nr. 1751 ist das gleiche Bild”), handwritten numbers and the inferred “Ermittelte
+  Photochromnummer” are not taken. Suffixes are dropped (`1381.B.P.Z.` → `1381`, `8337-2. P.Z.` → `8337`).
+- 89 numbers are printed on the back, not the front (noted as `auf der Rückseite`); they are
+  included.
 
 ## artwork-pairs.csv
 
