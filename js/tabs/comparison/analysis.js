@@ -71,12 +71,12 @@ export function render(container) {
           )
           .join('')}
       </fieldset>
-      <label class="control">
-        <span>Plot type</span>
-        <select name="plot-type">
+      <div class="control">
+        <span class="control-label"><label for="analysis-plot-type">Plot type</label>${infoTip('', 'About this plot type')}</span>
+        <select name="plot-type" id="analysis-plot-type">
           ${PLOT_TYPES.map((t) => option(t.id, t.label, t.id === state.plotType)).join('')}
         </select>
-      </label>
+      </div>
       <label class="control">
         <span>Point colors</span>
         <select name="color-mode">
@@ -91,7 +91,6 @@ export function render(container) {
       </label>
     </div>
 
-    <p class="analysis-description"></p>
     <p class="analysis-status" role="status" aria-live="polite"></p>
     <div class="analysis-plot"></div>
 
@@ -111,7 +110,7 @@ export function render(container) {
 
   els = {
     section,
-    description: section.querySelector('.analysis-description'),
+    description: section.querySelector('.control-label .info-pop'), // text of the "i" next to Plot type
     status: section.querySelector('.analysis-status'),
     plot: section.querySelector('.analysis-plot'),
   };

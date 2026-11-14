@@ -1,5 +1,5 @@
 // Media Library tab: toolbar (date, search, view), filter facets in a sidebar and the whole
-// collection as masonry mosaic or list.
+// collection as masonry mosaic, list or similarity map.
 // Click a tile or row to select it (selected works are the main images, left side, for the
 // Candidates tab); double-click (or Enter) opens the details dialog.
 // Sub-modules live in js/tabs/media-library/.
@@ -17,6 +17,7 @@ import { createDateFilter } from './media-library/date-filter.js';
 import {
   GROUPS, SOURCES, emptyFilters, facetCounts, matches,
 } from './media-library/filters.js';
+import { createClusterMap } from './media-library/cluster-map.js';
 import { createList } from './media-library/list.js';
 import { createMosaic } from './media-library/mosaic.js';
 
@@ -60,8 +61,9 @@ function render(container) {
         <div class="segmented ml-view-toggle" role="group" aria-label="View">
           <button type="button" data-view="mosaic" aria-pressed="true" aria-label="Mosaic" title="Mosaic">${icon('mosaic')}</button>
           <button type="button" data-view="list" aria-pressed="false" aria-label="List" title="List">${icon('list')}</button>
+          <button type="button" data-view="map" aria-pressed="false" aria-label="Similarity map" title="Similarity map">${icon('map')}</button>
         </div>
-        ${infoTip('Click an image or row to <b>select</b> it as a main image for the Candidates tab (Space with the keyboard). <b>Double-click</b> (or Enter) shows all details.', 'How to select and see details')}
+        ${infoTip('Click an image, row or map point to <b>select</b> it as a main image for the Candidates tab (Space with the keyboard). <b>Double-click</b> (or Enter) shows all details. In the map, the lasso and box tools (top right of the map) select all shown works inside.', 'How to select and see details')}
       </div>
 
       <div class="ml-active" role="group" aria-label="Active filters" hidden></div>
@@ -78,6 +80,7 @@ function render(container) {
         <section class="ml-works" aria-label="Works">
           <div class="ml-mosaic" data-pane="mosaic"></div>
           <div class="ml-list" data-pane="list" hidden></div>
+          <div class="ml-map" data-pane="map" hidden></div>
         </section>
       </div>
     </div>
@@ -114,18 +117,21 @@ function init(container, catalog, bar) {
   });
   const list = createList($('.ml-list'), { genres: catalog.genres, onOpen: open });
   const mosaic = createMosaic($('.ml-mosaic'), { onOpen: open });
+  const map = createClusterMap($('.ml-map'), { onOpen: open });
+  const views = { mosaic, list, map };
   loadPrintAreas()
-    .then((areas) => mosaic.setPrintAreas(areas))
+    .then((areas) => { mosaic.setPrintAreas(areas); map.setPrintAreas(areas); })
     .catch((err) => console.warn('No print areas, mosaic shows whole scans:', err));
 
   // --- view toggle (remembered per browser) ---
   let view = 'mosaic';
-  try { if (localStorage.getItem(VIEW_KEY) === 'list') view = 'list'; } catch { /* no storage */ }
+  try { const v = localStorage.getItem(VIEW_KEY); if (views[v]) view = v; } catch { /* no storage */ }
   function setView(v) {
     view = v;
     for (const btn of container.querySelectorAll('[data-view]')) btn.setAttribute('aria-pressed', String(btn.dataset.view === v));
     for (const pane of container.querySelectorAll('[data-pane]')) pane.hidden = pane.dataset.pane !== v;
-    (v === 'mosaic' ? mosaic : list).show();
+    if (v !== 'map') map.hide();
+    views[v].show();
     try { localStorage.setItem(VIEW_KEY, v); } catch { /* no storage */ }
   }
   $('.ml-view-toggle').addEventListener('click', (e) => {
@@ -259,6 +265,7 @@ function init(container, catalog, bar) {
 
     list.update(shownRecords);
     mosaic.update(shownRecords);
+    map.update(shownRecords);
     const withImage = shownRecords.filter(hasImage).length;
     $('.ml-summary').innerHTML = `<strong>${fmt(shownRecords.length)}</strong> of ${fmt(records.length)} works`
       + ` · ${fmt(withImage)} with online image`;
@@ -281,6 +288,7 @@ function init(container, catalog, bar) {
   onSelectionChange((ids) => {
     list.refresh();
     mosaic.refresh();
+    map.refresh();
     updateSelbar(ids);
   });
 

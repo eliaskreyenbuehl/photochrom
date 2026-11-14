@@ -108,6 +108,29 @@
 .ml-view-toggle > button { padding: 0 0.6rem; color: var(--muted); }
 
 .ml-mosaic-note { margin: 0; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: var(--muted); background: #faf9f6; border-bottom: 1px solid var(--border); }
+/* similarity map (cluster-map.js): Plotly fills the pane, custom hover card with thumbnail */
+.ml-map-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; padding: 0.4rem 0.75rem;
+  font-size: 0.8rem; color: var(--muted); background: #faf9f6; border-bottom: 1px solid var(--border);
+}
+.ml-map-bar p { margin: 0; }
+.ml-map-note { flex: 1; display: flex; align-items: center; gap: 0.25rem; }
+.ml-map-labels { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; color: var(--fg); }
+.ml-map-wrap { position: relative; flex: 1; min-height: 0; }
+.ml-map-plot { position: absolute; inset: 0; }
+.ml-map-status { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); }
+.ml-map-tip {
+  position: absolute; z-index: 5; width: 200px; padding: 6px; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-pop);
+  font-size: var(--text-xs);
+}
+.ml-map-tip-img { position: relative; overflow: hidden; border-radius: var(--radius-sm); background: #e9e6df; margin-bottom: 4px; }
+.ml-map-tip-img img { display: block; width: 100%; height: auto; }
+.ml-map-tip-img.cropped img { position: absolute; max-width: none; }
+.ml-map-tip-title { font-weight: 600; color: var(--fg); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ml-map-tip-meta { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); margin-top: 2px; }
+.ml-map-tip-meta .swatch { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+
 .ml-mosaic-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 6px; }
 .ml-mosaic-spacer { position: relative; }
 
