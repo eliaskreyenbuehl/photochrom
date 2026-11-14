@@ -43,6 +43,11 @@ Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` 
 
 Comparing images side by side is one of the key methods in art history. This tab creates candidate pairs for the Image Comparison tab.
 
+Workflow: Media Library (selection) → Candidates → Image Comparison (exactly two images).
+
+- **Pick two, compare**: the selected works appear as cards with a checkbox. Ticking two enables the **Compare** button in the selection bar at the bottom (same bar as in the Media Library: count, export, import, clear), which opens them as a pair in the Image Comparison tab. A third tick replaces the oldest.
+- **Find pairs**: suggests pairs for the selected works, each with its own Compare button. Sources: `data/candidates.csv` (photochrom–photochrom pairs written by pairing methods, format in `docs/data.md`); for works of the genre “Reproduction” the painting from `artwork-pairs.csv`. Image similarity via embeddings (in progress) will write its pairs to `candidates.csv`.
+
 The left image is always a main image from the Photochrom collection. The right image can be:
 
 - another image from the same collection that is related to the main image in some way
@@ -204,7 +209,7 @@ js/vendor/panzoom/        Panzoom 4.6.2 (MIT, vendored ES module + license) — 
 js/tabs/comparison.js     Image Comparison tab: wires the modules below together
 js/tabs/comparison/       sub-modules of the comparison tab
   store.js                  tab state (pair, images, view, alignment matrix, adjustments) + update/subscribe
-  pairs.js                  sample pairs (data/sample/sample-metadata.csv); the tab starts with one
+  pairs.js                  sample pairs (data/sample/sample-metadata.csv; the tab starts with one), photochrom–painting pairs and photochromSide() for the Candidates tab
   media.js                  image loading (crop to print area, thumbnail fallback), display canvases, canvas helpers (createCanvas, canvasFrom, imageDataOf)
   viewer.js                 side-by-side / overlay / slider / difference views, view toolbar (Move overlay / Pan tools, zoom), drag + keyboard
   zoom.js                   pan & zoom (pinch, Ctrl/⌘ + scroll, double-click, keys) on top of Panzoom
@@ -288,7 +293,7 @@ showTab('comparison');
 ### Image Comparison tab: how it works
 
 - **Image sources** (`js/lib/sources/`): the UI never builds image URLs itself; it asks the registry (`searchImages()`, `imageFromLink()`), which returns images in one shape (see `image.js`). A source is a module with `search()` and/or `fromLink()`; to add one (e.g. Wikidata, an API instead of `catalog.json`) write the module and add it to `SOURCES` in `index.js`. Links are tried catalog first, so e-rara / DOI / swisscollections links to photochroms in the library get the catalog record (metadata, print-area crop). CORS: Commons API and images, e-rara IIIF manifests and images allow it; e-rara DOI landing pages do not, so DOIs are only resolved through the catalog. Choosing an image makes a new pair (the other image is kept); there is no pair selector.
-- **Naming images**: never by role ("Original"/"Photochrom") — a pair can be two photochroms. An image is named by its photochrom number (if any) and title, `imageName()` in `pairs.js`, e.g. "No. 73 · Les illusions perdues"; where that does not fit (selectors, legends, sentences about overlap) use its position "Left"/"Right" (`POSITION` in `store.js`, `image.position`). `role` only selects the metadata fields. The number comes from `photochrom_number` (sample CSV) or the catalog field `n`.
+- **Naming images**: never by role ("Original"/"Photochrom") — a pair can be two photochroms. An image is named by its photochrom number (if any) and title, `imageName()` in `js/lib/sources/image.js`, e.g. "No. 73 · Les illusions perdues"; where that does not fit (selectors, legends, sentences about overlap) use its position "Left"/"Right" (`POSITION` in `store.js`, `image.position`). `role` only selects the metadata fields. The number comes from `photochrom_number` (sample CSV) or the catalog field `n`.
 - **State**: `comparison/store.js` holds the tab state. Change it only via `update(patch, reason)`; subscribers update only what the reason (`'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'blend' | 'divider' | 'adjust' | 'diff'`) affects — dragging the overlay fires `'transform'` on every pointer move, so that path must stay cheap (no layout reads, no DOM rebuilding).
 - **Per-view visibility**: the panel carries `data-view`; mark elements with `data-only="overlay slider"` etc. and CSS hides them in other views. Don't toggle `hidden` per view in JS.
 - **One geometric model**: a 3×3 homography `H` maps overlay *natural* pixels to base natural pixels. Auto-align sets `H`; manual move/scale/rotate is applied on top (`overlayMatrix()`). Swapping which image is on top inverts the matrix, so the alignment survives. All geometry is in natural pixels; convert to screen only at the edges (`geo.vs` × zoom).

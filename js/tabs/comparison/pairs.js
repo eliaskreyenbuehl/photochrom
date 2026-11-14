@@ -1,5 +1,6 @@
-// The sample pairs (data/sample/sample-metadata.csv, one row per pair): the comparison
-// tab starts with one of them. Other images are chosen with the image search
+// Pairs for the comparison tab: the sample pairs (data/sample/sample-metadata.csv; the tab
+// starts with one of them) and the photochrom–painting pairs offered by the Candidates
+// tab. In the comparison tab itself images are chosen with the image search
 // (js/lib/sources). See the pair shape in js/state.js.
 //
 // Images are named by photochrom number (if any) and title, never by role: a pair can
@@ -7,8 +8,12 @@
 // `role` ('original' | 'photochrom') only selects the metadata fields to show.
 
 import { SAMPLE_IMAGE_DIR, SAMPLE_METADATA_URL } from '../../config.js';
+import { fullImageUrl, loadCatalog } from '../../lib/catalog.js';
 import { loadCsvObjects } from '../../lib/csv.js';
-import { imageName } from '../../lib/sources/index.js';
+import { imageFromRecord, imageName } from '../../lib/sources/index.js';
+
+const ARTWORK_PAIRS_URL = 'data/artwork-pairs.csv';
+const COMMONS_IMAGES_URL = 'data/commons-images.csv';
 
 const pick = (row, prefixes) =>
   Object.fromEntries(Object.entries(row).filter(([key]) => prefixes.some((p) => key.startsWith(p))));
@@ -68,4 +73,55 @@ function pairFromRow(row) {
 export async function loadSamplePairs() {
   const rows = await loadCsvObjects(SAMPLE_METADATA_URL);
   return rows.map(pairFromRow);
+}
+
+/**
+ * One side of a pair for a photochrom from the catalog (data/catalog.json record), as
+ * the image search returns it (imageFromRecord in js/lib/sources/catalog.js).
+ * `extraFields` are added to the metadata (e.g. how the pair was found).
+ */
+export function photochromSide(rec, extraFields = {}) {
+  const side = imageFromRecord(rec);
+  return { ...side, fields: { ...side.fields, ...extraFields } };
+}
+
+/**
+ * Painting pairs from the catalog: photochroms that reproduce a painting, matched to the
+ * painting via Wikidata (data/artwork-pairs.csv, machine-made, unreviewed), with a
+ * CORS-enabled Commons image (data/commons-images.csv). Left = painting, right = photochrom,
+ * as in the sample pairs. The photochrom is loaded in zoom quality via fullImageUrl().
+ */
+export async function loadArtworkPairs() {
+  const [catalog, pairRows, commonsRows] = await Promise.all([
+    loadCatalog(), loadCsvObjects(ARTWORK_PAIRS_URL), loadCsvObjects(COMMONS_IMAGES_URL),
+  ]);
+  const commons = new Map(commonsRows.filter((c) => c.status === 'ok').map((c) => [c.commons_file, c]));
+  const pairs = [];
+  for (const row of pairRows) {
+    if (!['certain', 'uncertain'].includes(row.match_status)) continue;
+    const img = commons.get(row.commons_file);
+    const rec = catalog.byId.get(row.mms_id);
+    if (!img || !rec || !fullImageUrl(rec)) continue;
+    const work = row.work_label || row.note_work_title;
+    const photo = [img.artist && `Photo: ${img.artist}`, img.license].filter(Boolean).join(', ');
+    pairs.push({
+      id: `art-${row.mms_id}`,
+      label: `${row.artist_name} – ${work}${row.match_status === 'uncertain' ? ' (uncertain match)' : ''}`,
+      left: {
+        key: `painting:${row.mms_id}`,
+        role: 'original',
+        label: imageName({ title: work }),
+        title: work,
+        year: row.work_year,
+        url: img.thumb_url,
+        credit: `${row.artist_name}, ${work}${row.work_year ? ` (${row.work_year})` : ''}. ${row.collection || ''}${photo ? `. ${photo}` : ''}`,
+        creditUrl: row.commons_file,
+        fields: { ...pick(row, ['artist_', 'work_', 'note_work_', 'collection', 'location', 'inventory_number', 'museum_object_page', 'match_']),
+          commons_license: img.license, commons_artist: img.artist, commons_credit: img.credit },
+      },
+      right: photochromSide(rec, { match_status: row.match_status, review_status: row.review_status }),
+      group: 'painting',
+    });
+  }
+  return pairs.sort((a, b) => a.label.localeCompare(b.label));
 }
