@@ -30,6 +30,7 @@ photochrom/
 │       └── comparison.js            Image Comparison tab
 ├── data/
 │   ├── artwork-pairs.csv            240 photochroms reproducing paintings, matched to the originals (Wikidata, Commons)
+│   ├── candidates.csv               photochrom–photochrom candidate pairs from pairing methods (Candidates tab)
 │   ├── sample/                      2 comparison pairs as JPEG + sample-metadata.csv (full metadata, image rights)
 │   └── zenodo/                      copy of the dataset files (without images)
 │       ├── photochrom-metadata.csv      9,610 records, IIIF links, coordinates
