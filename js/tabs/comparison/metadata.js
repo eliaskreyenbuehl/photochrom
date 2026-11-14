@@ -7,6 +7,8 @@ const list = (s) => (s ? s.split('###').map((v) => v.trim()).filter(Boolean) : [
 // "Musizieren, ID: (DE-588)4170838-6" -> "Musizieren"
 const stripAuthorityIds = (s) => s.replace(/,? ID: \([^)]*\)[^\s,]*/g, '').replace(/, Role: /g, ' – ');
 const link = (text, href) => (href ? { text, href } : text);
+/** A link with a fixed text ("Manifest"): nothing when there is no URL. */
+const linkOnly = (text, href) => (href ? { text, href } : '');
 
 // [label, (fields) => string | string[] | { text, href }]
 const KEY_FIELDS = {
@@ -22,14 +24,15 @@ const KEY_FIELDS = {
     ['Image size', (f) => (f.original_full_width ? `${f.original_full_width} × ${f.original_full_height} px` : '')],
     ['Image credit', (f) => f.original_image_credit],
     ['Licence', (f) => link(f.original_image_license, f.original_image_license_url)],
-    ['Image source', (f) => link('Wikimedia Commons', f.original_commons_page)],
+    ['Image source', (f) => linkOnly('Wikimedia Commons', f.original_commons_page)],
     ['Pair match', (f) => (f.pair_match_status ? `${f.pair_match_status} (score ${f.pair_match_score}), ${f.pair_review_status}` : '')],
   ],
   photochrom: [
     ['Photochrom number', (f) => f.photochrom_number],
     ['Title', (f) => f.photochrom_title || f.title],
     ['Statement of responsibility', (f) => f.photochrom_statement_of_responsibility],
-    ['Date', (f) => f.photochrom_date_of_publication_or_production],
+    ['Date', (f) => f.photochrom_date_of_publication_or_production || f.date],
+    ['Depicted place', (f) => f.place],
     ['Publisher', (f) => f.photochrom_publisher_or_producer],
     ['Place', (f) => f.photochrom_place_of_publication_or_production],
     ['Physical description', (f) => f.photochrom_physical_description],
@@ -38,8 +41,21 @@ const KEY_FIELDS = {
     ['Subjects', (f) => list(f.photochrom_subject_topic).map(stripAuthorityIds)],
     ['Notes', (f) => list(f.photochrom_general_note)],
     ['DOI', (f) => link(f.photochrom_digital_object_identifier, doiUrl(f.photochrom_digital_object_identifier))],
-    ['IIIF manifest', (f) => link('Manifest', f.photochrom_iiif_manifest_url)],
+    ['IIIF manifest', (f) => linkOnly('Manifest', f.photochrom_iiif_manifest_url || f.iiif_manifest)],
     ['Rights', (f) => [f.photochrom_digital_reproduction_rights_owner, rightsLabel(f.photochrom_digital_reproduction_copyright)].filter(Boolean).join(', ')],
+    ['Catalog record', (f) => linkOnly('swisscollections', f.record)],
+  ],
+  // Images loaded from a link (Wikimedia Commons, e-rara items outside the library).
+  external: [
+    ['Title', (f) => f.title || f.Titel],
+    ['Artist', (f) => f.artist],
+    ['Date', (f) => f.date || f.Impressum],
+    ['Licence', (f) => link(f.license, f.license_url)],
+    ['Credit', (f) => f.credit],
+    ['Holding institution', (f) => f['Besitzende Institution']],
+    ['Extent', (f) => f.size || f.Umfang],
+    ['Description', (f) => f.description],
+    ['Source', (f) => (f.file_page ? linkOnly('Wikimedia Commons', f.file_page) : f.source)],
   ],
 };
 

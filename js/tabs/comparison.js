@@ -5,16 +5,17 @@
 
 import { DEFAULT_PAIR_ID } from '../config.js';
 import { loadCatalog } from '../lib/catalog.js';
+import { imageName } from '../lib/sources/index.js';
 import { isCropping, printAreaFor } from '../lib/print-area.js';
 import { getComparisonPair, onComparisonPairChange, setComparisonPair } from '../state.js';
 import * as analysis from './comparison/analysis.js';
 import { autoAlign } from './comparison/align.js';
 import { createControls } from './comparison/controls.js';
 import { createDiffView } from './comparison/diffview.js';
+import { createImagePicker } from './comparison/image-picker.js';
 import { loadDisplayImage, releaseImage } from './comparison/media.js';
-import { loadArtworkPairs, loadSamplePairs } from './comparison/pairs.js';
+import { loadSamplePairs } from './comparison/pairs.js';
 import { saveScreenshot } from './comparison/screenshot.js';
-import { imageName } from './comparison/pairs.js';
 import { POSITION, SIDES, VIEW_LABELS, baseImage, defaultManual, initialPairState, overlayImage, store, subscribe, update } from './comparison/store.js';
 import { createViewer } from './comparison/viewer.js';
 
@@ -22,7 +23,7 @@ let els = null;
 let controls = null;
 let diffView = null;
 let viewer = null;
-let pairs = [];
+let pickers = [];
 let started = false;
 let loadToken = 0;
 let cropToPrint = true; // crop photochroms to the print area (data/print-area.csv)
@@ -34,17 +35,20 @@ function setStatus(text, isError = false) {
 
 function setBusy(busy) {
   els.section.classList.toggle('is-loading', busy);
-  els.pairSelect.disabled = busy;
+  for (const picker of pickers) picker.setDisabled(busy);
   els.screenshot.disabled = busy || !store.pair;
 }
 
-/** Ensure the pair selector contains `pair` (pairs set from other tabs may be new). */
-function syncPairSelect(pair) {
-  if (!pairs.some((p) => p.id === pair.id)) {
-    pairs.push(pair);
-    els.pairSelect.append(new Option(pair.label, pair.id));
-  }
-  els.pairSelect.value = pair.id;
+/** File-name-safe id part for an image of a pair. */
+const imageKey = (pair, side) => (pair[side].key ?? `${pair.id}-${side}`).replace(/[^a-z0-9]+/gi, '-').slice(0, 60);
+
+/** Replace one image of the current pair (image picker): a new pair, the other image is kept. */
+function replaceImage(side, image) {
+  const current = store.pair;
+  const next = { ...current, [side]: image };
+  next.id = `custom-${imageKey(next, 'left')}-${imageKey(next, 'right')}`;
+  next.label = SIDES.map((s) => next[s].label || imageName(next[s])).join(' ↔ ');
+  setComparisonPair(next);
 }
 
 /** Add the print area box to a side that belongs to a catalog record (if a box exists). */
@@ -77,7 +81,6 @@ function cropStatus(images) {
 
 async function loadPair(pair) {
   const token = ++loadToken;
-  syncPairSelect(pair);
   setBusy(true);
   setStatus(`Loading ${pair.label}…`);
   try {
@@ -140,31 +143,22 @@ async function takeScreenshot() {
   }
 }
 
+/** Start with the pair sent by another tab, or the default sample pair. */
 async function start() {
-  setStatus('Loading sample pairs…');
-  try {
-    pairs = await loadSamplePairs();
-  } catch (err) {
-    setStatus(`Could not load the sample pairs: ${err.message}`, true);
-    return;
-  }
-  const samples = document.createElement('optgroup');
-  samples.label = 'Samples';
-  for (const pair of pairs) samples.append(new Option(pair.label, pair.id));
-  els.pairSelect.append(samples);
-  // Painting pairs from the catalog; a failure here must not block the samples.
-  loadArtworkPairs().then((artPairs) => {
-    const group = document.createElement('optgroup');
-    group.label = `Photochrom and painting (${artPairs.length}, Wikidata match, unreviewed)`;
-    for (const pair of artPairs) group.append(new Option(pair.label, pair.id));
-    els.pairSelect.append(group);
-    pairs.push(...artPairs);
-    if (store.pair) els.pairSelect.value = store.pair.id;
-  }).catch((err) => console.warn('Painting pairs not available:', err));
   onComparisonPairChange((pair) => pair && loadPair(pair));
-  const initial = getComparisonPair() ?? pairs.find((p) => p.id === DEFAULT_PAIR_ID) ?? pairs[0];
+  let initial = getComparisonPair();
+  if (!initial) {
+    setStatus('Loading the sample pair…');
+    try {
+      const samples = await loadSamplePairs();
+      initial = samples.find((p) => p.id === DEFAULT_PAIR_ID) ?? samples[0];
+    } catch (err) {
+      setStatus(`Could not load the sample pair: ${err.message}`, true);
+      return;
+    }
+  }
   if (initial) setComparisonPair(initial);
-  else setStatus('No sample pairs found.', true);
+  else setStatus('No sample pair found. Search for an image above.', true);
 }
 
 export default {
@@ -175,10 +169,7 @@ export default {
     container.innerHTML = `
       <h2>Image Comparison</h2>
       <div class="cmp-toolbar">
-        <label class="control">
-          <span>Pair</span>
-          <select name="cmp-pair"></select>
-        </label>
+        <div class="cmp-pickers"></div>
         <fieldset class="segmented">
           <legend>View</legend>
           ${Object.entries(VIEW_LABELS).map(
@@ -204,7 +195,6 @@ export default {
     els = {
       section: container,
       status: container.querySelector('.cmp-status'),
-      pairSelect: container.querySelector('select[name="cmp-pair"]'),
       screenshot: container.querySelector('[data-action="screenshot"]'),
       main: container.querySelector('.cmp-layout'),
     };
@@ -225,11 +215,12 @@ export default {
       onBusy: (busy) => controls.setDiffBusy(busy),
     });
     container.querySelector('.cmp-main').append(viewer.element);
+    pickers = SIDES.map((side) => createImagePicker({ position: POSITION[side], onPick: (image) => replaceImage(side, image) }));
+    container.querySelector('.cmp-pickers').append(...pickers.map((p) => p.element));
     container.querySelector('.cmp-sidebar').append(controls.element);
 
     analysis.render(container);
 
-    els.pairSelect.addEventListener('change', (e) => setComparisonPair(pairs.find((p) => p.id === e.target.value)));
     container.querySelectorAll('input[name="cmp-view"]').forEach((input) => input.addEventListener('change', () => selectView(input.value)));
     els.screenshot.addEventListener('click', takeScreenshot);
     container.querySelector('input[name="cmp-crop"]').addEventListener('change', (e) => {

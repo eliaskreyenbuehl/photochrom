@@ -291,6 +291,94 @@ body {
   height: auto;
 }
 
+/* Image pickers (left / right image search at the top of the tab) */
+#panel-comparison .cmp-pickers {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+@media (max-width: 640px) {
+  #panel-comparison .cmp-pickers { grid-template-columns: minmax(0, 1fr); }
+}
+
+#panel-comparison .cmp-picker { position: relative; }
+
+#panel-comparison .cmp-picker-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#panel-comparison .cmp-picker input {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#panel-comparison .cmp-picker input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#panel-comparison .cmp-picker input:disabled { color: var(--muted); }
+
+#panel-comparison .cmp-picker-list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 24rem;
+  margin: 0;
+  padding: 0.25rem 0;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+#panel-comparison .cmp-picker-option {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+#panel-comparison .cmp-picker-option[aria-selected="true"] { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
+
+#panel-comparison .cmp-picker-option img,
+#panel-comparison .cmp-picker-icon {
+  width: 4rem;
+  height: 3rem;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--surface-2);
+}
+
+#panel-comparison .cmp-picker-icon { display: grid; place-items: center; font-size: 1.2rem; color: var(--muted); }
+
+#panel-comparison .cmp-picker-text { display: flex; flex-direction: column; min-width: 0; font-size: 0.85rem; }
+#panel-comparison .cmp-picker-text strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#panel-comparison .cmp-picker-text span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#panel-comparison .cmp-picker-note { padding: 0.4rem 0.6rem; font-size: 0.8rem; color: var(--muted); }
+
+#panel-comparison .cmp-picker-status { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--muted); }
+#panel-comparison .cmp-picker-status:empty { display: none; }
+#panel-comparison .cmp-picker-status.is-error { color: var(--danger); }
+
 #panel-comparison .cmp-figure figcaption {
   margin-top: 0.4rem;
   font-size: 0.85rem;

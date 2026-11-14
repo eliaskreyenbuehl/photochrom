@@ -25,7 +25,7 @@ import { MAX_ZOOM, MIN_ZOOM, clampZoom, createZoom } from './zoom.js';
 const ZOOM_HINT = 'Pinch or Ctrl/⌘ + scroll to zoom, double-click to zoom in (Shift: out), 0 to fit.';
 
 const HINTS = {
-  side: 'Double-click an image (or click its title) to see it in full with all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together; turn it off to adjust one image, then on again to keep that offset.',
+  side: 'Choose the images with the search fields at the top (media library, or a pasted Wikimedia Commons / e-rara link). Double-click an image (or click its title) to see it in full with all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together; turn it off to adjust one image, then on again to keep that offset.',
   'overlay-move': `Move overlay: drag to move it, Shift + scroll scales, Alt + scroll rotates; with the image focused, arrow keys move, + / − scale, [ / ] rotate (Shift: larger steps). Hold Space or switch to Pan (H) to drag the view. ${ZOOM_HINT}`,
   'overlay-pan': `Pan: drag to move the view, arrow keys pan. Switch to Move overlay (V) to align. ${ZOOM_HINT}`,
   slider: `Drag the divider line (or press ← →) to compare; drag anywhere else to pan. ${ZOOM_HINT}`,

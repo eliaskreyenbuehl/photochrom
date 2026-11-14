@@ -1,20 +1,19 @@
-// Comparison pairs built from the sample metadata CSV (one row per pair) and from the
-// catalog (photochrom + painting). See the pair shape in js/state.js.
+// Pairs for the comparison tab: the sample pairs (data/sample/sample-metadata.csv; the tab
+// starts with one of them) and the photochrom–painting pairs offered by the Candidates
+// tab. In the comparison tab itself images are chosen with the image search
+// (js/lib/sources). See the pair shape in js/state.js.
 //
 // Images are named by photochrom number (if any) and title, never by role: a pair can
 // also be two photochroms, so the UI says "Left"/"Right" where a short name is needed.
 // `role` ('original' | 'photochrom') only selects the metadata fields to show.
 
 import { SAMPLE_IMAGE_DIR, SAMPLE_METADATA_URL } from '../../config.js';
-import { dateLabel, fullImageUrl, imageUrl, loadCatalog, recordUrl } from '../../lib/catalog.js';
+import { fullImageUrl, loadCatalog } from '../../lib/catalog.js';
 import { loadCsvObjects } from '../../lib/csv.js';
+import { imageFromRecord, imageName } from '../../lib/sources/index.js';
 
 const ARTWORK_PAIRS_URL = 'data/artwork-pairs.csv';
 const COMMONS_IMAGES_URL = 'data/commons-images.csv';
-
-// Longest side requested for photochroms in the comparison (zoom quality).
-// Recatalogued: e-rara IIIF scales to fit (4K scans); legacy: the 2K scan, its largest version.
-const PHOTOCHROM_ZOOM_SIZE = 4000;
 
 const pick = (row, prefixes) =>
   Object.fromEntries(Object.entries(row).filter(([key]) => prefixes.some((p) => key.startsWith(p))));
@@ -24,8 +23,6 @@ export const doiUrl = (doi) => (doi ? `https://doi.org/${doi}` : '');
 /** Readable copyright of a photochrom reproduction ('pdm' = Public Domain Mark). */
 export const rightsLabel = (code) => (code === 'pdm' ? 'Public Domain Mark' : code);
 
-/** Display name of an image: photochrom number (if any) and title, e.g. "No. 73 · Le soir". */
-export const imageName = ({ number, title }) => [number && `No. ${number}`, title].filter(Boolean).join(' · ') || 'Untitled';
 
 function originalCredit(row) {
   const work = [row.original_image_author, row.pair_work_label].filter(Boolean).join(', ');
@@ -46,6 +43,7 @@ function pairFromRow(row) {
     id: row.sample_id,
     label: `${row.original_image_author || row.pair_artist_name} – ${row.pair_work_label || row.photochrom_title}`,
     left: {
+      key: `sample:${row.sample_id}-painting`,
       role: 'original',
       label: imageName({ title: row.pair_work_label || row.pair_note_work_title }),
       title: row.pair_work_label || row.pair_note_work_title,
@@ -56,6 +54,7 @@ function pairFromRow(row) {
       fields: pick(row, ['pair_', 'original_']),
     },
     right: {
+      key: row.photochrom_identifier_swisscollections ? `catalog:${row.photochrom_identifier_swisscollections}` : `sample:${row.sample_id}-photochrom`,
       role: 'photochrom',
       label: imageName({ number: row.photochrom_number, title: row.photochrom_title }),
       number: row.photochrom_number,
@@ -77,25 +76,13 @@ export async function loadSamplePairs() {
 }
 
 /**
- * One side of a pair for a photochrom from the catalog (data/catalog.json record).
- * Loaded in zoom quality via fullImageUrl(), 300 px thumbnail as fallback.
+ * One side of a pair for a photochrom from the catalog (data/catalog.json record), as
+ * the image search returns it (imageFromRecord in js/lib/sources/catalog.js).
  * `extraFields` are added to the metadata (e.g. how the pair was found).
  */
 export function photochromSide(rec, extraFields = {}) {
-  return {
-    role: 'photochrom',
-    label: imageName({ number: rec.n, title: rec.t }),
-    number: rec.n,
-    title: rec.t,
-    year: dateLabel(rec),
-    url: fullImageUrl(rec, PHOTOCHROM_ZOOM_SIZE),
-    fallbackUrl: imageUrl(rec, 300), // own thumbnail service, if the full image is missing
-    credit: `${rec.t}${rec.d ? `, ${rec.d}` : ''}. Zentralbibliothek Zürich, Public Domain Mark`,
-    creditUrl: rec.doi ? doiUrl(rec.doi) : recordUrl(rec),
-    fields: { title: rec.t, photochrom_number: rec.n, date: rec.d, place: rec.p, countries: rec.c.join(', '), mms_id: rec.id,
-      subset: rec.s === 'r' ? 'recatalogued (IIIF)' : 'legacy', ...extraFields },
-    recordId: rec.id,
-  };
+  const side = imageFromRecord(rec);
+  return { ...side, fields: { ...side.fields, ...extraFields } };
 }
 
 /**
@@ -121,6 +108,7 @@ export async function loadArtworkPairs() {
       id: `art-${row.mms_id}`,
       label: `${row.artist_name} – ${work}${row.match_status === 'uncertain' ? ' (uncertain match)' : ''}`,
       left: {
+        key: `painting:${row.mms_id}`,
         role: 'original',
         label: imageName({ title: work }),
         title: work,
