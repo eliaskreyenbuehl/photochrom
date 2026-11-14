@@ -8,7 +8,19 @@ import pairMatchingTab from './tabs/pair-matching.js';
 
 const TABS = [mediaLibraryTab, pairMatchingTab, comparisonTab];
 
+/**
+ * The header with the tab bar sticks to the top of the window. Its height is published
+ * as --app-header-h, so fixed and sticky elements (details panel, sidebars) start below it.
+ */
+function trackHeaderHeight() {
+  const header = document.querySelector('.app-header');
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--app-header-h', `${header.offsetHeight}px`);
+  }).observe(header);
+}
+
 function init() {
+  trackHeaderHeight();
   const tabBar = document.querySelector('.tab-bar');
   const panels = document.getElementById('tab-panels');
 
