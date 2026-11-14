@@ -55,6 +55,7 @@ photochrom/
 - **Photochrom Colours** by Nobu ([NbtKmy](https://github.com/NbtKmy)): colour bands of the photochroms by year,
   and an overlay of art reproductions on the paintings they copy (drag, rotate, fade, difference blending).
   Repo: https://github.com/NbtKmy/glamhack2026_photochrom, live: https://nbtkmy.github.io/glamhack2026_photochrom/index.html
+- **Images on the Map** [https://nbtkmy.github.io/wiki-qlever/](https://nbtkmy.github.io/wiki-qlever/)
 
 ## Data and licences
 
