@@ -6,17 +6,26 @@
 //     label: 'My plot',              // shown in the plot type chooser
 //     description: '…',              // one sentence shown under the chooser
 //     build(series, options) {       // returns { data, layout } for Plotly.react
-//       // series:  [{ label, color, image }] — one entry, or two in compare mode
-//       //          image = result of analyzeImage() (see pixels.js)
-//       // options: { sampleSize, allImages }  allImages = every loaded image, so axis
-//       //          ranges can stay fixed when switching between single and compare mode
+//       // series:  [{ label, color, symbol, image, palette, cluster, selected }] — one
+//       //          entry, or two in compare mode. image = result of analyzeImage()
+//       //          (see pixels.js); palette = the palette shown below the plot;
+//       //          cluster[pixel] = its palette index; selected = palette index
+//       //          picked in the palette (-1 = none)
+//       // options: { sampleSize, allImages, colorMode }  allImages = every loaded
+//       //          image, so axis ranges stay fixed between single and compare mode;
+//       //          colorMode = 'pixel' | 'palette'
 //     },
 //   }
-// Single-image mode colors marks with the pixels' own colors; compare mode
-// colors each image with its series color so the two point clouds can be told apart.
+// Point colors (seriesTraces): in 'pixel' mode single-image plots use the pixels'
+// own colors and compare mode uses one series color per image; in 'palette' mode
+// every point gets the color of its nearest palette color and the palette colors
+// themselves are drawn as outlined markers sized by their share (as in
+// tests/color_outputs.py). A selected palette color is highlighted in both modes:
+// its points stay colored, all others turn gray.
 
 import { rgbCss, rgbHex, rgbToHsv, rgbToXy, hsvToRgb, labToRgb } from './color.js';
 import { DIAGRAM_RANGE, SPECTRAL_LOCUS, SRGB_GAMUT, horseshoeImage } from './cie1931.js';
+import { nearestPaletteIndex } from './palette.js';
 import { sampleIndices } from './pixels.js';
 
 const INK = '#1f1f1f';
@@ -42,13 +51,87 @@ const axis3d = (title, extra = {}) => ({
   ...extra,
 });
 
-const isCompare = (series) => series.length > 1;
+const MUTED = '#a8a49b';
 
-/** Marker for a series: pixel colors in single mode, series color in compare mode. */
-function seriesMarker(series, s, pixelColors, size) {
-  return isCompare(series)
-    ? { size, color: s.color, opacity: 0.55 }
-    : { size, color: pixelColors, opacity: 0.9 };
+const isCompare = (series) => series.length > 1;
+const pick = (values, ids) => ids.map((i) => values[i]);
+
+/**
+ * Point traces of one series.
+ * @param pts  { x, y, z?, custom, css, cluster } – arrays per point; css = the
+ *             point's own color, cluster = its palette index
+ * @param opts { type, size (number or per-point array), line, hovertemplate,
+ *             colorMode, centers: per palette color { x, y, z? } or null }
+ */
+function seriesTraces(series, s, pts, { type, size, line, hovertemplate, colorMode, centers }) {
+  const compare = isCompare(series);
+  const paletteMode = colorMode === 'palette' && s.palette?.length > 0;
+  const colorOf = paletteMode ? (i) => s.palette[pts.cluster[i]].hex : compare ? () => s.color : (i) => pts.css[i];
+  const symbol = compare ? s.symbol : 'circle';
+  const sizeOf = (ids) => (Array.isArray(size) ? pick(size, ids) : size);
+  const coords = (ids) => ({ x: pick(pts.x, ids), y: pick(pts.y, ids), ...(pts.z && { z: pick(pts.z, ids) }), customdata: pick(pts.custom, ids) });
+  const all = pts.x.map((_, i) => i);
+  const selected = s.palette?.[s.selected] ? s.selected : -1;
+  const traces = [];
+
+  if (selected < 0) {
+    traces.push({
+      type,
+      mode: 'markers',
+      name: s.label,
+      ...coords(all),
+      marker: { size: sizeOf(all), color: all.map(colorOf), symbol, opacity: compare && !paletteMode ? 0.55 : 0.9, line },
+      hovertemplate,
+    });
+  } else {
+    const chosen = all.filter((i) => pts.cluster[i] === selected);
+    const rest = all.filter((i) => pts.cluster[i] !== selected);
+    traces.push(
+      {
+        type,
+        mode: 'markers',
+        name: `${s.label} – other colors`,
+        showlegend: false,
+        ...coords(rest),
+        marker: { size: sizeOf(rest), color: MUTED, symbol, opacity: 0.12 },
+        hoverinfo: 'skip',
+      },
+      {
+        type,
+        mode: 'markers',
+        name: `${s.label} – ${s.palette[selected].hex}`,
+        ...coords(chosen),
+        marker: { size: sizeOf(chosen), color: chosen.map(colorOf), symbol, opacity: 0.95, line },
+        hovertemplate,
+      }
+    );
+  }
+  if (paletteMode && centers) traces.push(paletteCenters(s, centers, type, symbol, selected));
+  return traces;
+}
+
+/** The palette colors as outlined markers, sized by their share (selected one larger). */
+function paletteCenters(s, centers, type, symbol, selected) {
+  const ids = centers.map((p, i) => (p ? i : -1)).filter((i) => i >= 0);
+  return {
+    type,
+    mode: 'markers',
+    name: `${s.label} palette`,
+    showlegend: false,
+    x: ids.map((i) => centers[i].x),
+    y: ids.map((i) => centers[i].y),
+    ...(type === 'scatter3d' && { z: ids.map((i) => centers[i].z) }),
+    customdata: ids.map((i) => [s.palette[i].hex, (s.palette[i].share * 100).toFixed(1)]),
+    marker: {
+      size: ids.map((i) => (8 + 30 * Math.sqrt(s.palette[i].share)) * (i === selected ? 1.4 : 1)),
+      sizemode: 'diameter',
+      color: ids.map((i) => s.palette[i].hex),
+      symbol,
+      opacity: 1,
+      line: { color: INK, width: 2 },
+    },
+    hovertemplate: `Palette color %{customdata[0]} · %{customdata[1]} % of pixels<extra>${s.label}</extra>`,
+  };
 }
 
 /** Sampled pixels of an image with their sRGB values and css/hex colors. */
@@ -74,7 +157,7 @@ const cieXy = {
   label: 'CIE 1931 xy chromaticity',
   description:
     'Hue and saturation of each sampled pixel, independent of brightness. The outline is the spectral locus (wavelengths in nm); the dashed triangle is the sRGB gamut.',
-  build(series, { sampleSize }) {
+  build(series, { sampleSize, colorMode }) {
     const locusX = SPECTRAL_LOCUS.map((p) => p.x);
     const locusY = SPECTRAL_LOCUS.map((p) => p.y);
     const labelled = SPECTRAL_LOCUS.filter((p) => [460, 480, 490, 500, 510, 520, 540, 560, 580, 600, 620].includes(p.nm));
@@ -127,38 +210,40 @@ const cieXy = {
 
     for (const s of series) {
       const px = samplePixels(s.image, sampleSize);
-      const x = [];
-      const y = [];
-      const colors = [];
-      const hex = [];
+      const pts = { x: [], y: [], custom: [], css: [], cluster: [] };
       for (let i = 0; i < px.idx.length; i++) {
         const p = px.idx[i] * 3;
         const xy = rgbToXy(s.image.rgb[p], s.image.rgb[p + 1], s.image.rgb[p + 2]);
         if (!xy) continue; // pure black has no chromaticity
-        x.push(xy[0]);
-        y.push(xy[1]);
-        colors.push(px.css[i]);
-        hex.push(px.hex[i]);
+        pts.x.push(xy[0]);
+        pts.y.push(xy[1]);
+        pts.custom.push(px.hex[i]);
+        pts.css.push(px.css[i]);
+        pts.cluster.push(s.cluster?.[px.idx[i]]);
       }
-      const marker = seriesMarker(series, s, colors, 5);
-      if (!isCompare(series)) marker.line = { width: 0.5, color: 'rgba(0,0,0,0.45)' };
-      data.push({
-        type: 'scattergl',
-        mode: 'markers',
-        name: s.label,
-        x,
-        y,
-        customdata: hex,
-        marker,
-        hovertemplate: `%{customdata}<br>x %{x:.4f}, y %{y:.4f}<extra>${s.label}</extra>`,
+      const centers = s.palette?.map((c) => {
+        const xy = rgbToXy(...c.rgb);
+        return xy && { x: xy[0], y: xy[1] };
       });
+      data.push(
+        ...seriesTraces(series, s, pts, {
+          type: 'scattergl',
+          size: 5,
+          line: isCompare(series) ? undefined : { width: 0.5, color: 'rgba(0,0,0,0.45)' },
+          hovertemplate: `%{customdata}<br>x %{x:.4f}, y %{y:.4f}<extra>${s.label}</extra>`,
+          colorMode,
+          centers,
+        })
+      );
     }
 
     const layout = {
       ...BASE_LAYOUT,
       showlegend: isCompare(series),
-      xaxis: { title: { text: 'x' }, range: DIAGRAM_RANGE.x, gridcolor: GRID, zeroline: false, constrain: 'domain' },
-      yaxis: { title: { text: 'y' }, range: DIAGRAM_RANGE.y, gridcolor: GRID, zeroline: false, scaleanchor: 'x', scaleratio: 1 },
+      // Copies: Plotly writes zoom changes into the range arrays it is given, which
+      // would otherwise move the shared DIAGRAM_RANGE (and the background image).
+      xaxis: { title: { text: 'x' }, range: [...DIAGRAM_RANGE.x], gridcolor: GRID, zeroline: false, constrain: 'domain' },
+      yaxis: { title: { text: 'y' }, range: [...DIAGRAM_RANGE.y], gridcolor: GRID, zeroline: false, scaleanchor: 'x', scaleratio: 1 },
       images: [
         {
           source: horseshoeImage(),
@@ -211,6 +296,9 @@ const neutralAxis = {
   showlegend: false,
 };
 
+/** Palette colors positioned in Lab (x = a*, y = b*, z = L*). */
+const labCenters = (s) => s.palette?.map((c) => ({ x: c.lab[1], y: c.lab[2], z: c.lab[0] }));
+
 function labScene(range) {
   return {
     xaxis: axis3d('a* (green → red)', { range }),
@@ -226,30 +314,25 @@ const labScatter = {
   label: 'CIE Lab 3D – pixel colors',
   description:
     'Each sampled pixel placed in CIE L*a*b* space (perceptually uniform). The vertical line is the neutral gray axis. Drag to rotate, scroll to zoom.',
-  build(series, { sampleSize, allImages }) {
-    const traces = series.map((s) => {
+  build(series, { sampleSize, allImages, colorMode }) {
+    const traces = series.flatMap((s) => {
       const px = samplePixels(s.image, sampleSize);
       const n = px.idx.length;
-      const L = new Array(n);
-      const a = new Array(n);
-      const b = new Array(n);
+      const pts = { x: new Array(n), y: new Array(n), z: new Array(n), custom: px.hex, css: px.css, cluster: new Array(n) };
       for (let i = 0; i < n; i++) {
         const p = px.idx[i] * 3;
-        L[i] = s.image.lab[p];
-        a[i] = s.image.lab[p + 1];
-        b[i] = s.image.lab[p + 2];
+        pts.z[i] = s.image.lab[p];
+        pts.x[i] = s.image.lab[p + 1];
+        pts.y[i] = s.image.lab[p + 2];
+        pts.cluster[i] = s.cluster?.[px.idx[i]];
       }
-      return {
+      return seriesTraces(series, s, pts, {
         type: 'scatter3d',
-        mode: 'markers',
-        name: s.label,
-        x: a,
-        y: b,
-        z: L,
-        customdata: px.hex,
-        marker: seriesMarker(series, s, px.css, 2.5),
+        size: 2.5,
         hovertemplate: `%{customdata}<br>L* %{z:.1f}, a* %{x:.1f}, b* %{y:.1f}<extra>${s.label}</extra>`,
-      };
+        colorMode,
+        centers: labCenters(s),
+      });
     });
     const range = abRange(allImages);
     return {
@@ -308,26 +391,28 @@ const labFrequency = {
   id: 'lab-frequency',
   label: 'CIE Lab 3D – color frequency',
   description: `All pixels grouped into ${BIN}×${BIN}×${BIN} Lab bins; marker size shows how often a color occurs (the ${MAX_BINS_SHOWN} most frequent bins per image). Uses all pixels, not the sample.`,
-  build(series, { allImages }) {
+  build(series, { allImages, colorMode }) {
     const hists = series.map((s) => cachedHistogram(s.image));
     const maxShare = Math.max(...hists.map((h) => h[0]?.share ?? 0)) || 1;
-    const traces = series.map((s, si) => {
+    const traces = series.flatMap((s, si) => {
       const bins = hists[si];
-      const colors = bins.map((bin) => rgbCss(...labToRgb(bin.L, bin.a, bin.b)));
-      const marker = seriesMarker(series, s, colors, bins.map((bin) => 3 + 27 * Math.sqrt(bin.share / maxShare)));
-      marker.sizemode = 'diameter';
-      marker.line = { width: 0 };
-      return {
-        type: 'scatter3d',
-        mode: 'markers',
-        name: s.label,
+      const pts = {
         x: bins.map((bin) => bin.a),
         y: bins.map((bin) => bin.b),
         z: bins.map((bin) => bin.L),
-        customdata: bins.map((bin) => [rgbHex(...labToRgb(bin.L, bin.a, bin.b)), (bin.share * 100).toFixed(2)]),
-        marker,
-        hovertemplate: `%{customdata[0]} · %{customdata[1]}% of pixels<br>L* %{z:.1f}, a* %{x:.1f}, b* %{y:.1f}<extra>${s.label}</extra>`,
+        custom: bins.map((bin) => [rgbHex(...labToRgb(bin.L, bin.a, bin.b)), (bin.share * 100).toFixed(2)]),
+        css: bins.map((bin) => rgbCss(...labToRgb(bin.L, bin.a, bin.b))),
+        // A bin belongs to the palette color nearest to its mean color.
+        cluster: bins.map((bin) => (s.palette?.length ? nearestPaletteIndex(s.palette, bin.L, bin.a, bin.b) : undefined)),
       };
+      return seriesTraces(series, s, pts, {
+        type: 'scatter3d',
+        size: bins.map((bin) => 3 + 27 * Math.sqrt(bin.share / maxShare)),
+        line: { width: 0 },
+        hovertemplate: `%{customdata[0]} · %{customdata[1]}% of pixels<br>L* %{z:.1f}, a* %{x:.1f}, b* %{y:.1f}<extra>${s.label}</extra>`,
+        colorMode,
+        centers: labCenters(s),
+      });
     });
     const range = abRange(allImages);
     return {
@@ -360,34 +445,32 @@ const hsvCylinder = {
   label: 'HSV cylinder 3D',
   description:
     'Pixels in the HSV cylinder: angle = hue (see the colored ring at the top), distance from the center = saturation, height = value (brightness).',
-  build(series, { sampleSize }) {
-    const traces = series.map((s) => {
+  build(series, { sampleSize, colorMode }) {
+    const hsvPoint = (r, g, b) => {
+      const [h, sat, v] = rgbToHsv(r, g, b);
+      const rad = (h * Math.PI) / 180;
+      return { x: sat * Math.cos(rad), y: sat * Math.sin(rad), z: v, h, sat, v };
+    };
+    const traces = series.flatMap((s) => {
       const px = samplePixels(s.image, sampleSize);
       const n = px.idx.length;
-      const x = new Array(n);
-      const y = new Array(n);
-      const z = new Array(n);
-      const custom = new Array(n);
+      const pts = { x: new Array(n), y: new Array(n), z: new Array(n), custom: new Array(n), css: px.css, cluster: new Array(n) };
       for (let i = 0; i < n; i++) {
         const p = px.idx[i] * 3;
-        const [h, sat, v] = rgbToHsv(s.image.rgb[p], s.image.rgb[p + 1], s.image.rgb[p + 2]);
-        const rad = (h * Math.PI) / 180;
-        x[i] = sat * Math.cos(rad);
-        y[i] = sat * Math.sin(rad);
-        z[i] = v;
-        custom[i] = [px.hex[i], h.toFixed(0), (sat * 100).toFixed(0), (v * 100).toFixed(0)];
+        const q = hsvPoint(s.image.rgb[p], s.image.rgb[p + 1], s.image.rgb[p + 2]);
+        pts.x[i] = q.x;
+        pts.y[i] = q.y;
+        pts.z[i] = q.z;
+        pts.custom[i] = [px.hex[i], q.h.toFixed(0), (q.sat * 100).toFixed(0), (q.v * 100).toFixed(0)];
+        pts.cluster[i] = s.cluster?.[px.idx[i]];
       }
-      return {
+      return seriesTraces(series, s, pts, {
         type: 'scatter3d',
-        mode: 'markers',
-        name: s.label,
-        x,
-        y,
-        z,
-        customdata: custom,
-        marker: seriesMarker(series, s, px.css, 2.5),
+        size: 2.5,
         hovertemplate: `%{customdata[0]}<br>H %{customdata[1]}°, S %{customdata[2]}%, V %{customdata[3]}%<extra>${s.label}</extra>`,
-      };
+        colorMode,
+        centers: s.palette?.map((c) => hsvPoint(...c.rgb)),
+      });
     });
     return {
       data: [HUE_RING, ...traces],
