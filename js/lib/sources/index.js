@@ -12,12 +12,14 @@
 // library get the full catalog record (metadata, print-area crop) even when they point
 // to e-rara.
 
+import { loadCatalog, recordUrl } from '../catalog.js';
 import { catalogSource } from './catalog.js';
-import { commonsSource } from './commons.js';
+import { commonsFile, commonsSource } from './commons.js';
 import { eraraSource } from './erara.js';
+import { imageName } from './image.js';
 
 export { imageFromRecord } from './catalog.js';
-export { imageName } from './image.js';
+export { imageName };
 
 const SOURCES = [catalogSource, eraraSource, commonsSource];
 
@@ -51,4 +53,49 @@ export async function imageFromLink(url) {
     if (image) return image;
   }
   throw new Error(`This link is not supported. Paste ${LINK_HELP}.`);
+}
+
+const SWISSCOLLECTIONS = /^https:\/\/swisscollections\.ch\/Record\/(\d+)$/;
+const commonsPage = (file) => `https://commons.wikimedia.org/wiki/File:${encodeURI(file.replace(/ /g, '_'))}`;
+
+function commonsFileOf(...links) {
+  for (const link of links) {
+    const url = parseLink(link ?? '');
+    const file = url && commonsFile(url);
+    if (file) return file;
+  }
+  return null;
+}
+
+/**
+ * Stable web address of the work an image shows, independent of the image file and size:
+ * the swisscollections record for catalog photochroms, the Commons file page for Commons
+ * images (however they were linked), otherwise the source's page or the image URL.
+ * Used as annotation target (js/lib/annotation-model.js), so the same work always gets
+ * the same address.
+ */
+export function canonicalUrl(image) {
+  if (image.recordId) return recordUrl({ id: String(image.recordId) });
+  const file = image.key?.startsWith('commons:') ? image.key.slice(8) : commonsFileOf(image.creditUrl, image.url);
+  if (file) return commonsPage(file);
+  if (parseLink(image.creditUrl ?? '')) return image.creditUrl;
+  if (parseLink(image.url ?? '')) return image.url;
+  return `urn:photochrom:image:${encodeURIComponent(image.key ?? image.label ?? 'unknown')}`;
+}
+
+/** Short readable name for a canonicalUrl(): the catalog title, the Commons file name, or the link. */
+export async function describeUrl(link) {
+  const id = String(link).match(SWISSCOLLECTIONS)?.[1];
+  if (id) {
+    try {
+      const rec = (await loadCatalog()).byId.get(id);
+      if (rec) return imageName({ number: rec.n, title: rec.t });
+    } catch { /* catalog unavailable */ }
+    return `Record ${id}`;
+  }
+  const file = commonsFileOf(link);
+  if (file) return file.replace(/\.[a-z0-9]+$/i, '');
+  if (String(link).startsWith('urn:photochrom:image:')) return decodeURIComponent(link.slice(21));
+  const url = parseLink(link);
+  return url ? `${url.hostname}${url.pathname.length > 1 ? url.pathname : ''}` : String(link);
 }

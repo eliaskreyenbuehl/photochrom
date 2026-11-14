@@ -7,7 +7,9 @@ import { DEFAULT_PAIR_ID } from '../config.js';
 import { icon } from '../lib/ui/icons.js';
 import { infoTip } from '../lib/ui/info.js';
 import { loadCatalog } from '../lib/catalog.js';
-import { imageName } from '../lib/sources/index.js';
+import { canonicalUrl, imageName } from '../lib/sources/index.js';
+import * as annotationStore from '../lib/annotation-store.js';
+import { storagePanel } from '../lib/ui/annotations.js';
 import { isCropping, printAreaFor } from '../lib/print-area.js';
 import { getComparisonPair, onComparisonPairChange, setComparisonPair } from '../state.js';
 import * as analysis from './comparison/analysis.js';
@@ -109,6 +111,40 @@ async function loadPair(pair) {
   } finally {
     if (token === loadToken) setBusy(false);
   }
+}
+
+/**
+ * Sidebar group "Annotations": how many annotations each image has, a button to open its
+ * dialog (where annotations are written) and the storage panel (folder, export, import).
+ */
+function createAnnotationGroup() {
+  const group = document.createElement('details');
+  group.className = 'cmp-group cmp-annotations';
+  group.open = true;
+  group.innerHTML = `
+    <summary>Annotations ${infoTip('Comments, tags, regions and microscope images for an image, with your name and the time. Open an image (button below, double-click or Enter on it) and use the form under its metadata; the other image is linked, so the comparison is documented.', 'About annotations')}</summary>
+    <ul class="cmp-anno-images">
+      ${SIDES.map((side) => `<li><button type="button" class="btn btn-sm" data-side="${side}">${icon('note')}<span class="btn-label">${POSITION[side]} image</span></button> <span class="cmp-anno-count muted" data-side="${side}"></span></li>`).join('')}
+    </ul>
+  `;
+  group.append(storagePanel().element);
+  const updateCounts = () => {
+    for (const side of SIDES) {
+      const image = store.images[side];
+      const n = image ? annotationStore.countFor(canonicalUrl(image)) : 0;
+      const locked = annotationStore.getStatus().mode === 'locked';
+      group.querySelector(`.cmp-anno-count[data-side="${side}"]`).textContent = locked ? '' : n === 1 ? '1 annotation' : `${n} annotations`;
+      group.querySelector(`button[data-side="${side}"]`).disabled = !image;
+    }
+  };
+  group.addEventListener('click', (e) => {
+    const side = e.target.closest('button[data-side]')?.dataset.side;
+    if (side) viewer.openDialog(side, { annotate: true });
+  });
+  annotationStore.onChange(updateCounts);
+  subscribe((reason) => reason === 'pair' && updateCounts());
+  updateCounts();
+  return group;
 }
 
 async function runAutoAlign() {
@@ -222,7 +258,7 @@ export default {
     container.querySelector('.cmp-main').append(viewer.element);
     pickers = SIDES.map((side) => createImagePicker({ position: POSITION[side], onPick: (image) => replaceImage(side, image) }));
     container.querySelector('.cmp-pickers').append(...pickers.map((p) => p.element));
-    container.querySelector('.cmp-sidebar').append(controls.element);
+    container.querySelector('.cmp-sidebar').append(controls.element, createAnnotationGroup());
 
     analysis.render(container);
 
