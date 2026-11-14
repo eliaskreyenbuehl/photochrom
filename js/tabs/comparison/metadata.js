@@ -26,7 +26,8 @@ const KEY_FIELDS = {
     ['Pair match', (f) => (f.pair_match_status ? `${f.pair_match_status} (score ${f.pair_match_score}), ${f.pair_review_status}` : '')],
   ],
   photochrom: [
-    ['Title', (f) => f.photochrom_title],
+    ['Photochrom number', (f) => f.photochrom_number],
+    ['Title', (f) => f.photochrom_title || f.title],
     ['Statement of responsibility', (f) => f.photochrom_statement_of_responsibility],
     ['Date', (f) => f.photochrom_date_of_publication_or_production],
     ['Publisher', (f) => f.photochrom_publisher_or_producer],

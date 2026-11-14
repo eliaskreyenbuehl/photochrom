@@ -69,6 +69,20 @@ export function assignPixels(image, palette) {
   return assign;
 }
 
+/** Index of the palette color nearest (in Lab) to one color. */
+export function nearestPaletteIndex(palette, L, a, b) {
+  let best = 0;
+  let bestD = Infinity;
+  palette.forEach((c, i) => {
+    const d = (c.lab[0] - L) ** 2 + (c.lab[1] - a) ** 2 + (c.lab[2] - b) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
 function dist2(pts, i, centers, c) {
   const dL = pts[i * 3] - centers[c * 3];
   const da = pts[i * 3 + 1] - centers[c * 3 + 1];

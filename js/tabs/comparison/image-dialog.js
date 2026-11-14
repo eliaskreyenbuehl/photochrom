@@ -90,14 +90,14 @@ export function createImageDialog() {
 
   return {
     element: dialog,
-    /** Show one side of the pair ({ role, label, title, year, credit, creditUrl, fields, img }). */
+    /** Show one image of the pair ({ position, label, title, year, credit, creditUrl, fields, img }). */
     open(image) {
-      $('.cmp-dialog-role').textContent = image.label;
-      $('#cmp-dialog-title').textContent = image.title || image.label;
+      $('.cmp-dialog-role').textContent = `${image.position} image`;
+      $('#cmp-dialog-title').textContent = image.label; // number + title
       $('.cmp-dialog-year').textContent = image.year ?? '';
 
       const img = image.img.cloneNode();
-      img.alt = `${image.label}: ${image.title ?? ''}`;
+      img.alt = image.label;
       $('.cmp-dialog-viewport .cmp-zoom').replaceChildren(img);
 
       const credit = $('.cmp-dialog-credit');

@@ -33,9 +33,8 @@ function pairFromRecords(a, b, extraFields = {}) {
   return {
     id: `cand-${a.id}-${b.id}`,
     label: `${a.t} – ${b.t}`,
-    // Both sides are photochroms: number them so the Adjustments switch can tell them apart.
-    left: { ...photochromSide(a, extraFields), label: 'Photochrom 1' },
-    right: { ...photochromSide(b, extraFields), label: 'Photochrom 2' },
+    left: photochromSide(a, extraFields),
+    right: photochromSide(b, extraFields),
     group: 'candidates',
   };
 }

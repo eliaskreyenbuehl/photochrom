@@ -218,6 +218,8 @@ def main():
             rec["man"] = r["iiif_manifest_url"]
         if r["digital_object_identifier"]:
             rec["doi"] = r["digital_object_identifier"]
+        if r.get("photochrom_number"):
+            rec["n"] = r["photochrom_number"]
         if r["image_files"]:
             rec["img"] = Path(r["image_files"].split(" | ")[0]).stem
         if ic.get("beschreibung_en"):
@@ -255,6 +257,8 @@ def main():
             "ll": "primary coordinates [lat, lon]",
             "iiif": "IIIF Image API base URL of the first image (recatalogued only)",
             "man": "IIIF manifest URL", "doi": "DOI",
+            "n": "Photochrom number printed on the print (photochrom_number, see docs/data.md; "
+                 "rule-based, unreviewed)",
             "img": "image file name without extension (Zenodo image ZIPs); also the identifier on the thumbnail IIIF service",
             "desc": "short image description, machine-generated, unreviewed",
             "art": "match_status in artwork-pairs.csv (record reproduces a painting)",

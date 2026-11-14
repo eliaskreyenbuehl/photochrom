@@ -1,5 +1,9 @@
-// Comparison pairs built from the sample metadata CSV (one row per pair).
-// Left = original painting, right = photochrom (see the pair shape in js/state.js).
+// Comparison pairs built from the sample metadata CSV (one row per pair) and from the
+// catalog (photochrom + painting). See the pair shape in js/state.js.
+//
+// Images are named by photochrom number (if any) and title, never by role: a pair can
+// also be two photochroms, so the UI says "Left"/"Right" where a short name is needed.
+// `role` ('original' | 'photochrom') only selects the metadata fields to show.
 
 import { SAMPLE_IMAGE_DIR, SAMPLE_METADATA_URL } from '../../config.js';
 import { dateLabel, fullImageUrl, imageUrl, loadCatalog, recordUrl } from '../../lib/catalog.js';
@@ -19,6 +23,9 @@ export const isUrl = (s) => /^https?:\/\//.test(s);
 export const doiUrl = (doi) => (doi ? `https://doi.org/${doi}` : '');
 /** Readable copyright of a photochrom reproduction ('pdm' = Public Domain Mark). */
 export const rightsLabel = (code) => (code === 'pdm' ? 'Public Domain Mark' : code);
+
+/** Display name of an image: photochrom number (if any) and title, e.g. "No. 73 · Le soir". */
+export const imageName = ({ number, title }) => [number && `No. ${number}`, title].filter(Boolean).join(' · ') || 'Untitled';
 
 function originalCredit(row) {
   const work = [row.original_image_author, row.pair_work_label].filter(Boolean).join(', ');
@@ -40,7 +47,7 @@ function pairFromRow(row) {
     label: `${row.original_image_author || row.pair_artist_name} – ${row.pair_work_label || row.photochrom_title}`,
     left: {
       role: 'original',
-      label: 'Original',
+      label: imageName({ title: row.pair_work_label || row.pair_note_work_title }),
       title: row.pair_work_label || row.pair_note_work_title,
       year: row.pair_work_year,
       url: SAMPLE_IMAGE_DIR + row.original_file,
@@ -50,7 +57,8 @@ function pairFromRow(row) {
     },
     right: {
       role: 'photochrom',
-      label: 'Photochrom',
+      label: imageName({ number: row.photochrom_number, title: row.photochrom_title }),
+      number: row.photochrom_number,
       title: row.photochrom_title,
       year: row.photochrom_date_of_publication_or_production,
       url: SAMPLE_IMAGE_DIR + row.photochrom_file,
@@ -76,14 +84,15 @@ export async function loadSamplePairs() {
 export function photochromSide(rec, extraFields = {}) {
   return {
     role: 'photochrom',
-    label: 'Photochrom',
+    label: imageName({ number: rec.n, title: rec.t }),
+    number: rec.n,
     title: rec.t,
     year: dateLabel(rec),
     url: fullImageUrl(rec, PHOTOCHROM_ZOOM_SIZE),
     fallbackUrl: imageUrl(rec, 300), // own thumbnail service, if the full image is missing
     credit: `${rec.t}${rec.d ? `, ${rec.d}` : ''}. Zentralbibliothek Zürich, Public Domain Mark`,
     creditUrl: rec.doi ? doiUrl(rec.doi) : recordUrl(rec),
-    fields: { title: rec.t, date: rec.d, place: rec.p, countries: rec.c.join(', '), mms_id: rec.id,
+    fields: { title: rec.t, photochrom_number: rec.n, date: rec.d, place: rec.p, countries: rec.c.join(', '), mms_id: rec.id,
       subset: rec.s === 'r' ? 'recatalogued (IIIF)' : 'legacy', ...extraFields },
     recordId: rec.id,
   };
@@ -113,7 +122,7 @@ export async function loadArtworkPairs() {
       label: `${row.artist_name} – ${work}${row.match_status === 'uncertain' ? ' (uncertain match)' : ''}`,
       left: {
         role: 'original',
-        label: 'Original',
+        label: imageName({ title: work }),
         title: work,
         year: row.work_year,
         url: img.thumb_url,
