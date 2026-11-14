@@ -32,8 +32,8 @@ The start page: the whole collection (9,604 records) as filters and an image mos
 - **Date filter** (compact, in the filter panel): a tiny histogram of works per year, a range slider with two handles and START/END fields. The axis is fixed to 1889–1914. A record matches if its date range overlaps the selection. Option "exact dates only". Histogram: dark = dated to a single year, light = date spans spread evenly over their years (an estimate).
 - **Date rules** (`scripts/build_catalog.py`): photochrom production ended 1914, so records starting after 1914 are excluded from the catalog (6 records). Ranges ending after 1914 are cut at 1914 (flag `capped`), open ends ("after 1905") end at 1914 (flag `open`). Probable typos in catalog dates are flagged `suspect`, not corrected, and excluded by the date filter. The catalogued date is always shown as well.
 - **Filter pills**: genre, country, image content, source (with IIIF image, reproduces a painting). OR within a group, AND between groups; each pill shows its count given the other filters. Free-text search over title, place, country and MMS ID.
-- **Views**: *Mosaic* (default) shows the filtered works as uniform image tiles; *List* shows the work list with sortable columns. Both use virtual scrolling (only visible rows are in the page) and share the selection. Click a tile or row for details.
-- **Selection**: the checkbox on a tile or row makes the work a main image for the Candidates tab (open question for the team: should Photochrom–Photochrom pairs also be chosen here?). Kept in the browser only (localStorage), with export (CSV, JSON) and import.
+- **Views**: *Mosaic* (default) shows the filtered works as uniform image tiles; *List* shows the work list with sortable columns. Both use virtual scrolling (only visible rows are in the page) and share the selection. Mosaic/List is an icon toggle in the toolbar.
+- **Selection**: a click on a tile or row (or Space) selects the work as a main image for the Candidates tab; a double-click (or Enter) opens the details dialog with ← / → through the shown works. Selected works (open question for the team: should Photochrom–Photochrom pairs also be chosen here?) are kept in the browser only (localStorage), with export (CSV, JSON) and import.
 - **Images**: thumbnails come from an own static IIIF level 0 service, so scrolling does not load hundreds of images from e-rara. Sources and URLs for all sizes: see [Images: sources and URLs](#images-sources-and-urls).
 - **Image analyses over time**: the date histogram is the first step; later e.g. color values over time.
 
@@ -45,7 +45,7 @@ Comparing images side by side is one of the key methods in art history. This tab
 
 Workflow: Media Library (selection) → Candidates → Image Comparison (exactly two images).
 
-- **Pick two, compare**: the selected works appear as cards with a checkbox. Ticking two enables the **Compare** button in the selection bar at the bottom (same bar as in the Media Library: count, export, import, clear), which opens them as a pair in the Image Comparison tab. A third tick replaces the oldest.
+- **Pick two, compare**: the selected works appear as cards. Clicking a card (or its check box) picks it; picking two enables the **Compare** button in the selection bar at the bottom (same bar as in the Media Library: count, export, import, clear), which opens them as a pair in the Image Comparison tab. A third pick replaces the oldest. Double-click a card, or an image of a suggested pair, for its details.
 - **Find pairs**: suggests pairs for the selected works, each with its own Compare button. Sources: `data/candidates.csv` (photochrom–photochrom pairs written by pairing methods, format in `docs/data.md`); for works of the genre “Reproduction” the painting from `artwork-pairs.csv`. Image similarity via embeddings (in progress) will write its pairs to `candidates.csv`.
 
 The left image is always a main image from the Photochrom collection. The right image can be:
@@ -190,7 +190,7 @@ Plain static site: vanilla HTML/CSS/JS ES modules, **no build step, no npm**. Ru
 
 ```
 index.html                page shell: header, tab bar (nav.tab-bar), panel container (#tab-panels)
-css/styles.css            global styles + CSS variables (--bg, --fg, --muted, --accent, --border)
+css/styles.css            design tokens (CSS variables), shared components (.btn, .segmented, .badge, .info-btn, .card, .selbar, .details-dialog), Image Comparison styles
 js/main.js                registers tabs, builds tab buttons/panels, handles switching; exports showTab(id)
 js/config.js              SAMPLE_METADATA_URL, SAMPLE_IMAGE_DIR, DEFAULT_PAIR_ID — where the sample pairs come from
 js/state.js               shared state between tabs: Media Library selection (localStorage) and the comparison pair (setComparisonPair() / onComparisonPairChange())
@@ -199,6 +199,15 @@ js/lib/plotly.js          loadPlotly(): lazy-loads Plotly from its CDN on first 
 js/lib/opencv.js          loadOpenCV(): lazy-loads OpenCV.js (~10 MB) for auto-align
 js/lib/script.js          loadScript(url): inject a classic <script> once (used by the loaders above)
 js/lib/download.js        canvasToBlob(), downloadBlob() — saving generated PNGs
+js/lib/exchange.js        export/import of the selection (CSV, JSON)
+js/lib/ui/                UI components shared by all tabs (see "UI conventions" below)
+  icons.js                  icon(name): inline SVG icons, one style
+  info.js                   infoTip(text): small "i" button with a popover for help text
+  details.js                openDetails(image): details dialog (zoomable image + all metadata), the same in every tab
+  metadata.js               key fields per role (photochrom / original / external) + all fields of an image
+  zoom.js                   pan & zoom (pinch, Ctrl/⌘ + scroll, double-click, keys) on top of Panzoom
+  select-open.js            click selects, double-click / Enter opens (tiles, rows, cards)
+  selection-bar.js          selection bar at the bottom of Media Library and Candidates
 js/lib/sources/           image sources (fetch layer): where images come from, independent of the UI
   index.js                  registry: searchImages(), imageFromLink(), parseLink() — the only module the UI uses
   image.js                  shared image shape (documented there), imageName(), stripHtml(), fetchJson()
@@ -212,7 +221,6 @@ js/tabs/comparison/       sub-modules of the comparison tab
   pairs.js                  sample pairs (data/sample/sample-metadata.csv; the tab starts with one), photochrom–painting pairs and photochromSide() for the Candidates tab
   media.js                  image loading (crop to print area, thumbnail fallback), display canvases, canvas helpers (createCanvas, canvasFrom, imageDataOf)
   viewer.js                 side-by-side / overlay / slider / difference views, view toolbar (Move overlay / Pan tools, zoom), drag + keyboard
-  zoom.js                   pan & zoom (pinch, Ctrl/⌘ + scroll, double-click, keys) on top of Panzoom
   controls.js               sidebar: overlay & alignment, overlap %, differences, adjustments
   adjustments.js            per-image adjustments (CSS filter definitions)
   geometry.js               3×3 homography math, polygon clipping, overlap statistics
@@ -222,8 +230,6 @@ js/tabs/comparison/       sub-modules of the comparison tab
   diffview.js               computes the difference map for the viewer (heatmap canvas + HTML region boxes)
   screenshot.js             PNG export of the current view (or the zoomed-in part) incl. credits
   image-picker.js           "Left image" / "Right image" search fields at the top: choose from the library or a pasted link
-  image-dialog.js           dialog with the full (zoomable) image and its metadata, resizable split; opened from the side-by-side view
-  metadata.js               metadata of one image (key fields + all fields)
   analysis.js               color analysis section (UI: image/plot type/sample size chooser, plot)
   palette-view.js           palette bar (hex + share inside each color block, per-color copy), highlight in the image, copy all hex / image
   plot-types.js             PLOT_TYPES registry — add a plot type here (contract documented at the top of the file)
@@ -239,9 +245,7 @@ js/tabs/media-library/
   date-filter.js            compact date filter: tiny histogram, two-handle slider, START/END
   mosaic.js                 virtual-scrolling image mosaic with checkboxes
   list.js                   virtual-scrolling work list with checkboxes
-  details.js                detail panel for one record
-  exchange.js               export/import of the selection (CSV, JSON)
-css/media-library.css     styles of the Media Library (and candidate cards in the Candidates tab)
+css/media-library.css     styles of the Media Library and the Candidates tab
 scripts/build_catalog.py  builds data/catalog.json from the Zenodo CSVs (run after data updates)
 scripts/build_thumbs_iiif.py  builds static IIIF level 0 thumbnails for the photochrom-images repository
 js/tabs/pair-matching.js  Candidates tab (id 'pair-matching')
@@ -300,11 +304,24 @@ showTab('comparison');
 - **Display vs. export**: the viewer shows downscaled display canvases (≤ 4096 px) and positions the overlay with CSS `matrix3d()` (cheap, supports perspective). Screenshots (from the original images) and the difference map warp pixels in JS (`warp.js`).
 - **Difference blend** (overlay view, idea from the GLAMhack 2026 photochrom compare page, https://nbtkmy.github.io/glamhack2026_photochrom/compare.html): `mix-blend-mode: difference` on the overlay canvas; screenshots use `globalCompositeOperation = 'difference'` so they match the screen. It blends within the zoom wrapper (its transform makes it the isolation group), so keep base and overlay inside the same stacking context.
 - **Adjustments** are CSS filter strings (`adjustments.js`): `style.filter` on screen, `ctx.filter` in screenshots. The color analysis deliberately ignores them. Each image keeps its own values (`store.adjust.left/right`); the sidebar has one set of sliders plus an "Image to edit" selector, and marks images that have adjustments.
-- **Zoom/pan** (`zoom.js`) wraps Panzoom (vendored). Panzoom's focal-point math assumes the transformed element starts at its parent's top-left, so the zoom wrapper spans the viewport and centers its content itself. The stage routes pointer events by hand (`noBind`) so a drag does exactly one thing: pan, move the overlay or move the divider. Input conventions: pinch / Ctrl/⌘ + scroll zoom the view, plain scroll stays with the page (except in the modal image dialog, `wheelZoom: true`, where there is no page to scroll — the page is locked via `html.has-modal`), Shift/Alt + scroll only touch the overlay (Move tool), Space or middle button = temporary pan, a second finger always pinch-zooms. "Link" in the side-by-side view is relative: each change of one frame (zoom factor, pan as a fraction of the image size) is applied to the other, so offsets made while unlinked survive re-linking; "Fit" fits both silently. The slider divider lives in screen space (a child of the stage, not of the zoomed layer): it keeps its screen position while panning/zooming and `store.divider` (fraction of the base width) is recomputed from the zoom state, so it never leaves the view. Marks that belong to image positions but must keep their screen size (difference boxes) are HTML inside the zoomed layer sized with `calc(... * var(--inv-zoom))` — use widths or `box-shadow`, not borders: Chrome rounds borders below 1 px up to 1 px before the zoom scales them. Low-resolution layers (the heatmap) simply scale with the image.
+- **Zoom/pan** (`js/lib/ui/zoom.js`) wraps Panzoom (vendored). Panzoom's focal-point math assumes the transformed element starts at its parent's top-left, so the zoom wrapper spans the viewport and centers its content itself. The stage routes pointer events by hand (`noBind`) so a drag does exactly one thing: pan, move the overlay or move the divider. Input conventions: pinch / Ctrl/⌘ + scroll zoom the view, plain scroll stays with the page (except in the modal details dialog, `wheelZoom: true`, where there is no page to scroll — the page is locked via `html.has-modal`), Shift/Alt + scroll only touch the overlay (Move tool), Space or middle button = temporary pan, a second finger always pinch-zooms. "Link" in the side-by-side view is relative: each change of one frame (zoom factor, pan as a fraction of the image size) is applied to the other, so offsets made while unlinked survive re-linking; "Fit" fits both silently. The slider divider lives in screen space (a child of the stage, not of the zoomed layer): it keeps its screen position while panning/zooming and `store.divider` (fraction of the base width) is recomputed from the zoom state, so it never leaves the view. Marks that belong to image positions but must keep their screen size (difference boxes) are HTML inside the zoomed layer sized with `calc(... * var(--inv-zoom))` — use widths or `box-shadow`, not borders: Chrome rounds borders below 1 px up to 1 px before the zoom scales them. Low-resolution layers (the heatmap) simply scale with the image.
 - **Auto-align** (`align.js`, OpenCV.js lazy-loaded from jsDelivr, ≈10 MB): grayscale + CLAHE, ORB then AKAZE (SIFT is not in the build), ratio test, RANSAC homography, plus a plausibility check (convex quad, sane area). It only works when the reproduction is a photographic copy: the Gleyre pair aligns (~330 inliers), the Correggio photochrom is a redrawn detail and does not — manual alignment is the fallback.
 - **Color analysis plots** (`analysis.js`, `plot-types.js`): the palettes are computed once per image and palette size in `analysis.js` and shared by the palette bar and the plots. "Point colors: Palette colors" colors every plot point by its nearest palette color and draws the palette colors as outlined markers sized `8 + 30·√share` (like the Clusters/Centroids layers of the Python analysis in `tests/color_outputs.py`); selecting a palette color highlights its points in the plot (others gray) in both modes. Builders use `seriesTraces()` for their point traces, so new plot types get both features.
 - **Difference map** (`difference.js`): photochroms are recolored, so it compares *locally normalised luminance* (structure), not colors. The threshold mapping `1.2 · 0.25^(sensitivity/100)` was calibrated on the aligned Gleyre pair (median score ≈ 0.17, 99th percentile ≈ 0.66); image borders and the overlap edge are excluded because local statistics are unreliable there. It is a heuristic: misalignment shows up as differences along edges.
 - **Overlap %** comes from clipping the mapped overlay quad against the base rectangle. With "Crop to print" on, photochroms are cropped to the print first, so color charts and scan borders no longer count (boxes are machine-generated; about 1 in 10 is imperfect).
+
+### UI conventions
+
+Keep the three tabs consistent; reuse the shared pieces instead of writing tab-specific copies.
+
+- **Tokens**: colors, radii, control heights and text sizes are CSS variables at the top of `css/styles.css`. No raw hex values or new radii in tab styles. Radii: `--radius-sm` thumbnails, `--radius` controls, `--radius-lg` panels and cards.
+- **Buttons**: `.btn` (default), `.btn-primary` (the one main action of an area: Open in Candidates, Compare, Auto-align), `.btn-ghost` (toolbars), `.btn-sm`, `.btn-icon` (icon only: needs `aria-label` and `title`). Toggle buttons use `aria-pressed`. Choices of 2–4 options: `.segmented` (buttons with `aria-pressed`, or radio labels in a fieldset). Text links inside text: `.link-btn`.
+- **Icons**: `icon(name)` from `js/lib/ui/icons.js` (16 px, 1.5 px stroke, `currentColor`); next to a text label, or alone with `aria-label` + `title`. Add new icons there, never inline SVG in a tab.
+- **Help text**: short hints as `title` tooltips; longer help that is not needed in normal use behind `infoTip()` (the "i" button, opens on hover or click). Status and error messages stay visible.
+- **Machine-generated data**: label with `<span class="badge badge-machine">machine-generated</span>` (or "– machine-generated" in plain-text values).
+- **Images in grids and lists**: click selects (check box + outline), double-click or Enter opens `openDetails()`, Space toggles (`js/lib/ui/select-open.js`). The selectable element has `role="checkbox"` + `aria-checked` and contains a visual `.check-box`.
+- **Details**: always `openDetails(image)` with the image shape of `js/lib/sources/image.js`; pass `recordId` for catalog records (adds the record block, links and the Select toggle) and `browse` for ← / →.
+- **Headings**: each tab has a visually hidden `h2` (the tab bar shows the name), sections use `h3`.
 
 ### Constraints & gotchas
 
@@ -317,6 +334,8 @@ showTab('comparison');
 - **ResizeObserver**: if the callback changes the observed element's height (as the viewer does), react to width changes only, in a `requestAnimationFrame`, or it loops ("ResizeObserver loop completed with undelivered notifications").
 - **Narrow screens**: `fieldset` has an intrinsic min width; set `min-inline-size: 0` and `max-width: 100%` on form controls, or the page overflows horizontally on phones.
 - **Long metadata keys**: raw CSV column names are long; list them name-above-value, and cap label columns (`fit-content(40%)`) so values keep their space. Container queries (`container-type: inline-size`) adapt lists to a resizable panel.
+- **Popovers** (`infoTip`): `toggle` events do not bubble, listen in the capture phase. A popover opened on hover must ignore the click that follows (the click would toggle it closed); `info.js` handles this.
+- **Click vs. double-click**: a double-click fires two clicks first. `select-open.js` toggles on the first click (`detail === 1`), ignores the second and undoes the toggle on `dblclick`, so a double-click only opens details. Update selected state in place (no re-render between the clicks) so the dblclick target survives.
 - **Opening a dialog with Enter**: call `preventDefault()` on the keydown, or the same key press activates the button that receives focus in the dialog (closing it again).
 - **Clipboard**: `navigator.clipboard.write` with images needs a secure context, a user gesture and `ClipboardItem` support. Always offer a fallback (show the text / download the PNG).
 - **Testing interaction**: there is no test runner. Serve the folder and drive headless Chrome via the DevTools protocol (`Input.dispatchMouseEvent` / `dispatchTouchEvent` / `dispatchKeyEvent` give real pointer, wheel, pinch and key events). Use a fresh profile per run (Chrome caches ES modules aggressively), and remember that `+` in a URL query decodes to a space. Headless Chrome has no clipboard and cannot go below ~500 px window width.

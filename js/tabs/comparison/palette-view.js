@@ -76,7 +76,7 @@ function paletteImage(palette) {
 }
 
 function button(text, action) {
-  const el = Object.assign(document.createElement('button'), { type: 'button', className: 'button button-small', textContent: text });
+  const el = Object.assign(document.createElement('button'), { type: 'button', className: 'btn btn-sm', textContent: text });
   el.dataset.action = action;
   return el;
 }

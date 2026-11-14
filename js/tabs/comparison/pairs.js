@@ -11,6 +11,7 @@ import { SAMPLE_IMAGE_DIR, SAMPLE_METADATA_URL } from '../../config.js';
 import { fullImageUrl, loadCatalog } from '../../lib/catalog.js';
 import { loadCsvObjects } from '../../lib/csv.js';
 import { imageFromRecord, imageName } from '../../lib/sources/index.js';
+import { doiUrl, isUrl, rightsLabel } from '../../lib/ui/metadata.js';
 
 const ARTWORK_PAIRS_URL = 'data/artwork-pairs.csv';
 const COMMONS_IMAGES_URL = 'data/commons-images.csv';
@@ -18,10 +19,6 @@ const COMMONS_IMAGES_URL = 'data/commons-images.csv';
 const pick = (row, prefixes) =>
   Object.fromEntries(Object.entries(row).filter(([key]) => prefixes.some((p) => key.startsWith(p))));
 
-export const isUrl = (s) => /^https?:\/\//.test(s);
-export const doiUrl = (doi) => (doi ? `https://doi.org/${doi}` : '');
-/** Readable copyright of a photochrom reproduction ('pdm' = Public Domain Mark). */
-export const rightsLabel = (code) => (code === 'pdm' ? 'Public Domain Mark' : code);
 
 
 function originalCredit(row) {

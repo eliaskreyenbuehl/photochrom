@@ -1,7 +1,7 @@
 // Export and import of the selection as a file. Nothing is uploaded:
 // export creates a download in the browser, import reads a local file.
 
-import { recordUrl } from '../../lib/catalog.js';
+import { recordUrl } from './catalog.js';
 
 function download(name, type, text) {
   const url = URL.createObjectURL(new Blob([text], { type }));

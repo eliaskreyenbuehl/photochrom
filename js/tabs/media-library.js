@@ -1,17 +1,19 @@
 // Media Library tab: toolbar (date, search, view), filter facets in a sidebar and the whole
 // collection as masonry mosaic or list.
-// Checked rows become main images (left side) for the Candidates tab.
+// Click a tile or row to select it (selected works are the main images, left side, for the
+// Candidates tab); double-click (or Enter) opens the details dialog.
 // Sub-modules live in js/tabs/media-library/.
 
 import { escapeHtml, hasImage, loadCatalog } from '../lib/catalog.js';
 import { loadPrintAreas } from '../lib/print-area.js';
+import { imageFromRecord } from '../lib/sources/index.js';
+import { openDetails } from '../lib/ui/details.js';
+import { icon } from '../lib/ui/icons.js';
+import { infoTip } from '../lib/ui/info.js';
+import { createSelectionBar } from '../lib/ui/selection-bar.js';
 import { showTab } from '../main.js';
-import {
-  addToSelection, clearSelection, getSelection, onSelectionChange, removeFromSelection,
-} from '../state.js';
+import { addToSelection, getSelection, onSelectionChange, removeFromSelection } from '../state.js';
 import { createDateFilter } from './media-library/date-filter.js';
-import { createDetails } from './media-library/details.js';
-import { exportCsv, exportJson, importFile } from './media-library/exchange.js';
 import {
   GROUPS, SOURCES, emptyFilters, facetCounts, matches,
 } from './media-library/filters.js';
@@ -25,9 +27,13 @@ const fmt = (n) => n.toLocaleString('en-US');
 const GROUP_LABELS = {
   genre: 'Genre', country: 'Country', feature: 'Image content', source: 'Source',
 };
-const GROUP_NOTES = {
-  genre: 'machine-generated', feature: 'machine-generated, unreviewed',
+// Groups whose values are machine-generated (labelled in the sidebar, explained in the info tip).
+const GROUP_INFO = {
+  genre: 'Genres were assigned by a model from title and image, not reviewed by a person. Expect some errors.',
+  feature: 'Image content (people, boats, mountains …) was detected by a vision model, not reviewed by a person. Expect some errors.',
+  source: '<b>With image (IIIF)</b>: recatalogued records with a zoomable e-rara image. <b>Reproduces a painting</b>: matched to a painting via Wikidata (machine-made, unreviewed).',
 };
+const MACHINE_GROUPS = new Set(['genre', 'feature']);
 // Values shown per group before "Show all"; active values are always shown.
 const GROUP_SHOWN = { genre: 6, country: 8, feature: 8, source: Infinity };
 // Groups that start collapsed (they open by themselves when one of their values is active).
@@ -35,25 +41,27 @@ const GROUP_CLOSED = new Set(['feature']);
 
 function render(container) {
   container.innerHTML = `
+    <h2 class="visually-hidden">Media Library</h2>
     <div class="ml">
       <div class="ml-toolbar">
-        <button type="button" class="ml-facets-btn" aria-controls="ml-facets" aria-expanded="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
-          Filters <span class="ml-facets-n" hidden></span>
+        <button type="button" class="btn ml-facets-btn" aria-controls="ml-facets" aria-expanded="true" title="Show or hide the filters">
+          ${icon('filter')}<span class="btn-label">Filters</span><span class="count-pill" hidden></span>
         </button>
         <p class="ml-summary" aria-live="polite">Loading catalog…</p>
         <div class="ml-date-wrap">
-          <span class="ml-date-label">Date</span>
+          <span class="ml-date-label">Date ${infoTip('Works per year, 1889–1914. <b>Dark</b>: dated to a single year. <b>Light</b>: date ranges, spread evenly over their years (an estimate). A work matches if its date range overlaps the selected years. Suspect catalog dates are left out.', 'About the date filter')}</span>
           <div class="ml-date"></div>
         </div>
-        <label class="ml-search">
+        <label class="search-field ml-search">
+          ${icon('search')}
           <span class="visually-hidden">Search title, place, country or MMS ID</span>
           <input type="search" placeholder="Search title, place, country, MMS ID" disabled>
         </label>
-        <div class="ml-view-toggle" role="group" aria-label="View">
-          <button type="button" data-view="mosaic" aria-pressed="true">Mosaic</button>
-          <button type="button" data-view="list" aria-pressed="false">List</button>
+        <div class="segmented ml-view-toggle" role="group" aria-label="View">
+          <button type="button" data-view="mosaic" aria-pressed="true" aria-label="Mosaic" title="Mosaic">${icon('mosaic')}</button>
+          <button type="button" data-view="list" aria-pressed="false" aria-label="List" title="List">${icon('list')}</button>
         </div>
+        ${infoTip('Click an image or row to <b>select</b> it as a main image for the Candidates tab (Space with the keyboard). <b>Double-click</b> (or Enter) shows all details.', 'How to select and see details')}
       </div>
 
       <div class="ml-active" role="group" aria-label="Active filters" hidden></div>
@@ -62,7 +70,7 @@ function render(container) {
         <aside class="ml-facets" id="ml-facets" aria-label="Filters">
           ${GROUPS.map((g) => `
             <details class="ml-facet" data-group="${g}"${GROUP_CLOSED.has(g) ? '' : ' open'}>
-              <summary>${GROUP_LABELS[g]}${GROUP_NOTES[g] ? ` <small>${GROUP_NOTES[g]}</small>` : ''}</summary>
+              <summary>${GROUP_LABELS[g]}${MACHINE_GROUPS.has(g) ? ' <span class="badge badge-machine">machine-generated</span>' : ''}${GROUP_INFO[g] ? infoTip(GROUP_INFO[g], `About ${GROUP_LABELS[g]}`) : ''}</summary>
               <div class="ml-facet-list" role="group" aria-label="${GROUP_LABELS[g]}"></div>
             </details>`).join('')}
         </aside>
@@ -72,32 +80,26 @@ function render(container) {
           <div class="ml-list" data-pane="list" hidden></div>
         </section>
       </div>
-
-      <div class="ml-selbar" role="region" aria-label="Selection">
-        <span class="ml-selcount"></span>
-        <button type="button" data-act="select-shown">Select all shown</button>
-        <button type="button" data-act="deselect-shown">Deselect shown</button>
-        <span class="sep" aria-hidden="true"></span>
-        <button type="button" data-act="export-csv">Export CSV</button>
-        <button type="button" data-act="export-json">Export JSON</button>
-        <button type="button" data-act="import">Import…</button>
-        <input type="file" accept=".json,.csv,.txt" hidden>
-        <button type="button" data-act="clear">Clear</button>
-        <span class="ml-selmsg" aria-live="polite"></span>
-        <button type="button" class="primary" data-act="to-pairing">Open in Candidates →</button>
-      </div>
     </div>
   `;
+  const bar = createSelectionBar({
+    extra: [
+      { act: 'select-shown', icon: 'check-all', label: 'Select all shown', title: 'Add all works that match the filters' },
+      { act: 'deselect-shown', icon: 'check-none', label: 'Deselect shown', title: 'Remove all works that match the filters from the selection' },
+    ],
+    primary: { act: 'to-pairing', icon: 'arrow-right', trailing: true, label: 'Open in Candidates', title: 'Find pairs for the selected works' },
+  });
+  container.querySelector('.ml').append(bar.element);
 
   loadCatalog()
-    .then((catalog) => init(container, catalog))
+    .then((catalog) => init(container, catalog, bar))
     .catch((err) => {
       container.querySelector('.ml-summary').textContent = `Could not load the catalog (${err.message}). `
         + 'If you opened index.html as a file, serve the folder instead: python -m http.server';
     });
 }
 
-function init(container, catalog) {
+function init(container, catalog, bar) {
   const { records } = catalog;
   const f = emptyFilters();
   const $ = (sel) => container.querySelector(sel);
@@ -106,8 +108,10 @@ function init(container, catalog) {
     domain: catalog.years,
     onChange({ years, exactOnly }) { f.years = years; f.exactOnly = exactOnly; apply(); },
   });
-  const details = createDetails(container.querySelector('.ml'), catalog);
-  const open = (r) => details.open(r);
+  // Details of a work, with ← / → through the works in the order of the current view.
+  const open = (items, index) => openDetails(imageFromRecord(items[index]), {
+    browse: { index, count: items.length, at: (i) => imageFromRecord(items[i]) },
+  });
   const list = createList($('.ml-list'), { genres: catalog.genres, onOpen: open });
   const mosaic = createMosaic($('.ml-mosaic'), { onOpen: open });
   loadPrintAreas()
@@ -249,7 +253,7 @@ function init(container, catalog) {
     bar.hidden = chips.length === 0;
     bar.innerHTML = chips.map(([kind, value, label]) => `<button type="button" class="ml-chip" data-chip="${kind}" data-value="${escapeHtml(String(value))}" aria-label="Remove filter ${escapeHtml(label)}">${escapeHtml(label)} <span aria-hidden="true">×</span></button>`).join('')
       + '<button type="button" class="link-btn" data-reset>Reset all</button>';
-    const n = $('.ml-facets-n');
+    const n = $('.ml-facets-btn .count-pill');
     n.hidden = chips.length === 0;
     n.textContent = chips.length;
 
@@ -262,58 +266,21 @@ function init(container, catalog) {
   }
 
   // --- selection bar ---
-  const fileInput = $('.ml-selbar input[type=file]');
-  const msg = $('.ml-selmsg');
-  let clearArmed = null;
-
   function updateSelbar(ids = getSelection()) {
-    $('.ml-selcount').innerHTML = `<strong>${fmt(ids.length)}</strong> main image${ids.length === 1 ? '' : 's'} selected`;
-    $('[data-act="select-shown"]').textContent = `Select all shown (${fmt(shownRecords.length)})`;
-    for (const act of ['export-csv', 'export-json', 'clear', 'to-pairing']) {
-      $(`[data-act="${act}"]`).disabled = ids.length === 0;
-    }
+    bar.update(ids);
+    bar.setLabel('select-shown', `Select all shown (${fmt(shownRecords.length)})`);
+    bar.button('to-pairing').disabled = ids.length === 0;
   }
-
-  $('.ml-selbar').addEventListener('click', async (e) => {
+  bar.element.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!act) return;
-    msg.textContent = '';
-    const ids = getSelection();
     if (act === 'select-shown') addToSelection(shownRecords.map((r) => r.id));
     else if (act === 'deselect-shown') removeFromSelection(shownRecords.map((r) => r.id));
-    else if (act === 'export-csv') exportCsv(ids, catalog);
-    else if (act === 'export-json') exportJson(ids);
-    else if (act === 'import') fileInput.click();
     else if (act === 'to-pairing') showTab('pair-matching');
-    else if (act === 'clear') {
-      // Two clicks instead of a confirm dialog.
-      const btn = e.target.closest('button');
-      if (clearArmed) {
-        clearTimeout(clearArmed);
-        clearArmed = null;
-        btn.textContent = 'Clear';
-        clearSelection();
-      } else {
-        btn.textContent = 'Click again to clear';
-        clearArmed = setTimeout(() => { clearArmed = null; btn.textContent = 'Clear'; }, 3000);
-      }
-    }
-  });
-
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
-    fileInput.value = '';
-    if (!file) return;
-    const { known, unknown } = await importFile(file, catalog);
-    addToSelection(known);
-    msg.textContent = `Imported ${fmt(known.length)} record${known.length === 1 ? '' : 's'}`
-      + (unknown.length ? `, ${fmt(unknown.length)} unknown ID${unknown.length === 1 ? '' : 's'} skipped` : '');
   });
 
   onSelectionChange((ids) => {
     list.refresh();
     mosaic.refresh();
-    details.refresh();
     updateSelbar(ids);
   });
 

@@ -1,8 +1,9 @@
 // Candidates tab (id 'pair-matching', kept for links and the URL hash #pair-matching).
 // The step between the Media Library and the Image Comparison tab, which works with exactly two images.
 //
-// - Shows the works selected in the Media Library. Tick two of them and press "Compare"
-//   to open them as a pair in the Image Comparison tab.
+// - Shows the works selected in the Media Library. Click two of them (or tick their boxes)
+//   and press "Compare" to open them as a pair in the Image Comparison tab. Double-click
+//   an image for its details.
 // - "Find pairs" suggests pairs for the selected works:
 //     * data/candidates.csv: pairs between two photochroms, one row per pair, written by
 //       pairing methods (e.g. embedding similarity). Columns: see docs/data.md.
@@ -12,9 +13,14 @@
 
 import { dateLabel, escapeHtml, fullImageUrl, imageUrl, loadCatalog } from '../lib/catalog.js';
 import { loadCsvObjects } from '../lib/csv.js';
+import { imageFromRecord } from '../lib/sources/index.js';
+import { openDetails } from '../lib/ui/details.js';
+import { icon } from '../lib/ui/icons.js';
+import { infoTip } from '../lib/ui/info.js';
+import { bindSelectAndOpen } from '../lib/ui/select-open.js';
+import { createSelectionBar } from '../lib/ui/selection-bar.js';
 import { showTab } from '../main.js';
-import { addToSelection, clearSelection, getSelection, onSelectionChange, setComparisonPair, setSelected } from '../state.js';
-import { exportCsv, exportJson, importFile } from './media-library/exchange.js';
+import { getSelection, onSelectionChange, setComparisonPair, setSelected } from '../state.js';
 import { loadArtworkPairs, photochromSide } from './comparison/pairs.js';
 
 const CANDIDATES_URL = 'data/candidates.csv';
@@ -23,6 +29,8 @@ const LIMIT = 200; // keep the page light when many works are selected
 
 let container;
 let main; // redrawn part of the tab; the selection bar below it stays
+let bar; // selection bar (js/lib/ui/selection-bar.js)
+let shownIds = []; // MMS IDs of the cards, in order (for browsing in the details dialog)
 let picked = []; // up to two MMS IDs ticked for comparison, oldest first
 let suggestions = null; // null = "Find pairs" not run yet; else { pairs, notes }
 let statusText = '';
@@ -83,7 +91,7 @@ async function paintingPairs(catalog, selected) {
 }
 
 async function findPairs() {
-  const button = container.querySelector('.cand-find');
+  const button = container.querySelector('[data-act="find"]');
   button.disabled = true;
   setStatus('Searching…');
   try {
@@ -113,6 +121,8 @@ function thumb(side) {
   return side.fallbackUrl || side.url;
 }
 
+const MACHINE = '<span class="badge badge-machine" title="Machine-generated, not reviewed">machine-generated</span>';
+
 function suggestionsHtml() {
   if (!suggestions) return '';
   pairsById.clear();
@@ -120,146 +130,112 @@ function suggestionsHtml() {
   const items = pairs.map((p) => {
     pairsById.set(p.id, p);
     const method = p.method === 'wikidata-painting'
-      ? 'Painting via Wikidata (unreviewed)'
+      ? 'Painting via Wikidata'
       : `${escapeHtml(p.method)}${p.score ? ` · score ${escapeHtml(p.score)}` : ''}`;
+    const img = (side) => `<img src="${escapeHtml(thumb(p[side]))}" alt="${escapeHtml(p[side].label || p[side].title || '')}" loading="lazy" data-side="${side}" title="Double-click for details">`;
     return `
-      <li class="cand-pair">
-        <div class="cand-pair-imgs">
-          <img src="${escapeHtml(thumb(p.left))}" alt="" loading="lazy">
-          <img src="${escapeHtml(thumb(p.right))}" alt="" loading="lazy">
+      <li class="card cand-pair" data-pair-card="${escapeHtml(p.id)}">
+        <div class="cand-pair-imgs">${img('left')}${img('right')}</div>
+        <div class="card-body">
+          <strong class="card-title" title="${escapeHtml(p.label)}">${escapeHtml(p.label)}</strong>
+          <span class="card-meta">${method} ${MACHINE}</span>
         </div>
-        <div class="cand-pair-body">
-          <strong>${escapeHtml(p.label)}</strong>
-          <span class="muted">${method}</span>
-          <button type="button" class="cand-compare-btn" data-pair="${escapeHtml(p.id)}">Compare</button>
+        <div class="card-foot">
+          <button type="button" class="btn btn-primary btn-sm" data-pair="${escapeHtml(p.id)}">${icon('compare')}<span class="btn-label">Compare</span></button>
         </div>
       </li>`;
   }).join('');
   return `
     <section class="cand-section">
-      <h3>Suggested pairs (${pairs.length})</h3>
+      <h3>Suggested pairs <span class="count-pill">${pairs.length}</span></h3>
       ${notes.map((n) => `<p class="muted">${escapeHtml(n)}</p>`).join('')}
-      ${pairs.length ? `<ul class="cand-pairs">${items}</ul>` : '<p class="placeholder">No pairs found for the selected works.</p>'}
+      ${pairs.length ? `<ul class="card-grid cand-pairs">${items}</ul>` : '<p class="placeholder">No pairs found for the selected works.</p>'}
     </section>`;
 }
+
+const HEADING = '<h2 class="visually-hidden">Candidates</h2>';
+const FIND_INFO = 'Suggests pairs for the selected works: photochrom–photochrom pairs from <code>data/candidates.csv</code> (written by pairing methods such as image similarity), and for works of the genre “Reproduction” the painting they reproduce (Wikidata match). All suggestions are machine-generated and unreviewed.';
+const PICK_INFO = 'Click two images (or tick their boxes) to pick them, then press <b>Compare</b> in the bar below. A third pick replaces the oldest. <b>Double-click</b> an image for its details.';
 
 async function draw() {
   const ids = getSelection();
   picked = picked.filter((id) => ids.includes(id)); // drop works removed from the selection
   updateBar(ids);
   if (!ids.length) {
-    main.innerHTML = `
-      <h2>Candidates</h2>
-      <p class="placeholder">No images selected yet. Tick works in the Media Library to bring them here.</p>`;
+    shownIds = [];
+    main.innerHTML = `${HEADING}
+      <p class="placeholder">No works selected yet. Select works in the Media Library (click an image) to bring them here.</p>`;
     return;
   }
   const catalog = await loadCatalog();
-  const cards = ids.slice(0, LIMIT).map((id) => {
+  shownIds = ids.slice(0, LIMIT).filter((id) => catalog.byId.has(id));
+  const cards = shownIds.map((id, i) => {
     const r = catalog.byId.get(id);
-    if (!r) return '';
     const img = imageUrl(r, 300);
     const on = picked.includes(id);
     const title = escapeHtml(r.t);
     return `
-      <li class="pm-card${on ? ' picked' : ''}">
-        <label class="pm-card-check"><input type="checkbox" data-pick="${r.id}" ${on ? 'checked' : ''}><span class="sr-only">Compare: ${title}</span></label>
-        ${img ? `<img src="${img}" alt="" loading="lazy">` : '<div class="no-img">No online image yet</div>'}
-        <div class="pm-card-body">
-          <strong>${title}</strong>
-          <span class="muted">${escapeHtml(dateLabel(r))}${r.p ? ` · ${escapeHtml(r.p)}` : ''}${r.g === REPRODUCTION ? ' · Reproduction' : ''}</span>
-          <button type="button" class="link-btn" data-remove="${r.id}">Remove</button>
+      <li class="card pm-card${on ? ' picked' : ''}" data-id="${r.id}" data-i="${i}" tabindex="0" role="checkbox" aria-checked="${on}" aria-label="${title}">
+        <div class="card-media">
+          ${img ? `<img src="${img}" alt="" loading="lazy">` : '<div class="no-img">No online image yet</div>'}
+          <span class="check-box" aria-hidden="true"></span>
+          <button type="button" class="btn btn-icon btn-sm card-remove" data-remove="${r.id}" aria-label="Remove ${title} from the selection" title="Remove from the selection">${icon('close')}</button>
+        </div>
+        <div class="card-body">
+          <strong class="card-title" title="${title}">${title}</strong>
+          <span class="card-meta">${escapeHtml(dateLabel(r))}${r.p ? ` · ${escapeHtml(r.p)}` : ''}${r.g === REPRODUCTION ? ' · Reproduction' : ''}</span>
         </div>
       </li>`;
   }).join('');
-  main.innerHTML = `
-    <h2>Candidates</h2>
-    <div class="cand-toolbar">
-      <button type="button" class="cand-find">Find pairs</button>
+  main.innerHTML = `${HEADING}
+    <div class="toolbar cand-toolbar">
+      <button type="button" class="btn" data-act="find">${icon('sparkle')}<span class="btn-label">Find pairs</span></button>
+      ${infoTip(FIND_INFO, 'How pairs are found')}
       <span class="cand-status muted" role="status" aria-live="polite">${escapeHtml(statusText)}</span>
     </div>
     ${suggestionsHtml()}
     <section class="cand-section">
-      <h3>Selected works (${ids.length.toLocaleString('en-US')})</h3>
-      <p class="muted">Tick two images, then press Compare in the bar below.</p>
-      <ul class="pm-grid">${cards}</ul>
+      <h3>Selected works <span class="count-pill">${ids.length.toLocaleString('en-US')}</span> ${infoTip(PICK_INFO, 'How to compare two works')}</h3>
+      <ul class="card-grid pm-grid">${cards}</ul>
       ${ids.length > LIMIT ? `<p class="muted">Showing the first ${LIMIT}.</p>` : ''}
     </section>`;
 }
 
-// --- selection bar (same as in the Media Library, without the filter actions) ---
-
-const fmt = (n) => n.toLocaleString('en-US');
-let clearArmed = null;
-
-function barHtml() {
-  return `
-    <div class="ml-selbar" role="region" aria-label="Selection">
-      <span class="ml-selcount"></span>
-      <span class="sep" aria-hidden="true"></span>
-      <button type="button" data-act="export-csv">Export CSV</button>
-      <button type="button" data-act="export-json">Export JSON</button>
-      <button type="button" data-act="import">Import…</button>
-      <input type="file" accept=".json,.csv,.txt" hidden>
-      <button type="button" data-act="clear">Clear</button>
-      <span class="ml-selmsg" aria-live="polite"></span>
-      <button type="button" class="primary" data-act="compare" disabled>Compare (0/2)</button>
-    </div>`;
+/** Update the picked state of the cards in place (keeps focus, and a double-click intact). */
+function syncPicks() {
+  for (const card of main.querySelectorAll('.pm-card')) {
+    const on = picked.includes(card.dataset.id);
+    card.classList.toggle('picked', on);
+    card.setAttribute('aria-checked', String(on));
+  }
+  updateBar();
 }
+
+// --- selection bar (js/lib/ui/selection-bar.js, as in the Media Library) ---
 
 function updateBar(ids = getSelection()) {
-  const bar = container.querySelector('.ml-selbar');
-  bar.querySelector('.ml-selcount').innerHTML = `<strong>${fmt(ids.length)}</strong> image${ids.length === 1 ? '' : 's'} selected`;
-  for (const act of ['export-csv', 'export-json', 'clear']) {
-    bar.querySelector(`[data-act="${act}"]`).disabled = ids.length === 0;
-  }
-  const compare = bar.querySelector('[data-act="compare"]');
+  bar.update(ids);
+  const compare = bar.button('compare');
   compare.disabled = picked.length !== 2;
-  compare.textContent = `Compare (${picked.length}/2)`;
+  bar.setLabel('compare', `Compare (${picked.length}/2)`);
 }
 
-function wireBar() {
-  const bar = container.querySelector('.ml-selbar');
-  const fileInput = bar.querySelector('input[type=file]');
-  const msg = bar.querySelector('.ml-selmsg');
-  bar.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-act]');
-    if (!btn) return;
-    const act = btn.dataset.act;
-    msg.textContent = '';
-    const ids = getSelection();
-    if (act === 'compare') compareSelected();
-    else if (act === 'export-csv') exportCsv(ids, await loadCatalog());
-    else if (act === 'export-json') exportJson(ids);
-    else if (act === 'import') fileInput.click();
-    else if (act === 'clear') {
-      // Two clicks instead of a confirm dialog, as in the Media Library.
-      if (clearArmed) {
-        clearTimeout(clearArmed);
-        clearArmed = null;
-        btn.textContent = 'Clear';
-        clearSelection();
-      } else {
-        btn.textContent = 'Click again to clear';
-        clearArmed = setTimeout(() => { clearArmed = null; btn.textContent = 'Clear'; }, 3000);
-      }
-    }
-  });
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
-    fileInput.value = '';
-    if (!file) return;
-    const { known, unknown } = await importFile(file, await loadCatalog());
-    addToSelection(known);
-    msg.textContent = `Imported ${fmt(known.length)} record${known.length === 1 ? '' : 's'}`
-      + (unknown.length ? `, ${fmt(unknown.length)} unknown ID${unknown.length === 1 ? '' : 's'} skipped` : '');
-  });
-}
-
-function togglePick(id, on) {
+/** Pick or unpick a work; returns a function that restores the previous picks. */
+function togglePick(id) {
+  const before = picked;
+  const on = !picked.includes(id);
   picked = picked.filter((p) => p !== id);
   if (on) picked.push(id);
-  if (picked.length > 2) picked = picked.slice(-2); // a third tick replaces the oldest
-  draw();
+  if (picked.length > 2) picked = picked.slice(-2); // a third pick replaces the oldest
+  syncPicks();
+  return () => { picked = before; syncPicks(); };
+}
+
+/** Details of a selected work, with ← / → through the cards. */
+async function openWork(index) {
+  const catalog = await loadCatalog();
+  const at = (i) => imageFromRecord(catalog.byId.get(shownIds[i]));
+  openDetails(at(index), { browse: { index, count: shownIds.length, at } });
 }
 
 async function compareSelected() {
@@ -276,19 +252,31 @@ export default {
 
   render(el) {
     container = el;
-    container.innerHTML = `<div class="cand-main"></div>${barHtml()}`;
+    container.innerHTML = '<div class="cand-main"></div>';
     main = container.querySelector('.cand-main');
-    wireBar();
+    bar = createSelectionBar({
+      primary: { act: 'compare', icon: 'compare', label: 'Compare (0/2)', title: 'Open the two picked works in the Image Comparison tab' },
+      onAction: (act) => act === 'compare' && compareSelected(),
+    });
+    container.append(bar.element);
     main.addEventListener('click', (e) => {
       const remove = e.target.closest('[data-remove]')?.dataset.remove;
       if (remove) return setSelected(remove, false);
-      if (e.target.closest('.cand-find')) return findPairs();
+      if (e.target.closest('[data-act="find"]')) return findPairs();
       const pairId = e.target.closest('[data-pair]')?.dataset.pair;
       if (pairId && pairsById.has(pairId)) openInComparison(pairsById.get(pairId));
     });
-    main.addEventListener('change', (e) => {
-      const box = e.target.closest('[data-pick]');
-      if (box) togglePick(box.dataset.pick, box.checked);
+    // Selected works: click picks for comparison, double-click / Enter shows details.
+    bindSelectAndOpen(main, {
+      item: (target) => target.closest('.pm-card'),
+      toggle: (card) => togglePick(card.dataset.id),
+      open: (card) => openWork(Number(card.dataset.i)),
+    });
+    // Suggested pairs: double-click an image for its details.
+    main.addEventListener('dblclick', (e) => {
+      const img = e.target.closest('.cand-pair img[data-side]');
+      const pair = pairsById.get(img?.closest('[data-pair-card]')?.dataset.pairCard);
+      if (pair) openDetails(pair[img.dataset.side]);
     });
     onSelectionChange(() => {
       suggestions = null; // suggestions belong to the old selection

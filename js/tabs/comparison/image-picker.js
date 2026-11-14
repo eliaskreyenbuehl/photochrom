@@ -4,6 +4,7 @@
 // decides where images come from.
 
 import { LINK_HELP, imageFromLink, linkSourceLabel, parseLink, searchImages } from '../../lib/sources/index.js';
+import { icon } from '../../lib/ui/icons.js';
 
 const LIMIT = 20;
 const DEBOUNCE = 150; // ms
@@ -20,10 +21,13 @@ export function createImagePicker({ position, onPick }) {
   root.className = 'cmp-picker';
   root.innerHTML = `
     <label class="cmp-picker-label" for="${id}-input">${position} image</label>
-    <input id="${id}-input" type="search" autocomplete="off" spellcheck="false"
-      role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-list"
-      aria-describedby="${id}-status"
-      placeholder="Search the library or paste a Commons / e-rara link">
+    <span class="search-field">
+      ${icon('search')}
+      <input id="${id}-input" type="search" autocomplete="off" spellcheck="false"
+        role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-list"
+        aria-describedby="${id}-status"
+        placeholder="Search the library or paste a Commons / e-rara link">
+    </span>
     <ul id="${id}-list" class="cmp-picker-list" role="listbox" aria-label="Images" hidden></ul>
     <p id="${id}-status" class="cmp-picker-status" role="status" aria-live="polite"></p>
   `;

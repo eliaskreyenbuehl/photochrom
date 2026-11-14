@@ -12,6 +12,7 @@ export const SIDES = ['left', 'right'];
 export const POSITION = { left: 'Left', right: 'Right' };
 
 export const VIEW_LABELS = { side: 'Side by side', overlay: 'Overlay', slider: 'Slider', diff: 'Differences' };
+export const VIEW_ICONS = { side: 'side', overlay: 'overlay', slider: 'slider', diff: 'difference' }; // js/lib/ui/icons.js
 
 export const defaultManual = () => ({ tx: 0, ty: 0, scale: 1, rotation: 0 });
 const defaultAdjust = () => ({ left: defaultAdjustments(), right: defaultAdjustments() });

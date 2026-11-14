@@ -1,7 +1,11 @@
-// Metadata of one image (shown in the image dialog): key fields plus a disclosure
-// with every column. Values come from the pair's `fields` (columns of sample-metadata.csv).
+// Metadata fields of one image (shown in the details dialog, js/lib/ui/details.js): curated
+// key fields per role plus a disclosure with every column. Values come from the image's
+// `fields` (columns of sample-metadata.csv, artwork-pairs.csv, catalog or link sources).
 
-import { doiUrl, isUrl, rightsLabel } from './pairs.js';
+export const isUrl = (s) => /^https?:\/\//.test(s);
+export const doiUrl = (doi) => (doi ? `https://doi.org/${doi}` : '');
+/** Readable copyright of a photochrom reproduction ('pdm' = Public Domain Mark). */
+export const rightsLabel = (code) => (code === 'pdm' ? 'Public Domain Mark' : code);
 
 const list = (s) => (s ? s.split('###').map((v) => v.trim()).filter(Boolean) : []);
 // "Musizieren, ID: (DE-588)4170838-6" -> "Musizieren"
@@ -12,20 +16,32 @@ const linkOnly = (text, href) => (href ? { text, href } : '');
 
 // [label, (fields) => string | string[] | { text, href }]
 const KEY_FIELDS = {
+  // Sample pairs (pair_*, original_* columns of sample-metadata.csv) and painting pairs
+  // (artwork-pairs.csv + commons-images.csv, see loadArtworkPairs in comparison/pairs.js).
   original: [
-    ['Artist', (f) => f.pair_artist_name],
-    ['Work', (f) => f.pair_work_label],
-    ['Title in catalogue note', (f) => f.pair_note_work_title],
-    ['Date', (f) => f.pair_note_work_date || f.pair_work_year],
-    ['Collection', (f) => f.pair_collection],
-    ['Location', (f) => f.pair_location],
-    ['Inventory number', (f) => f.pair_inventory_number],
-    ['Wikidata', (f) => link(f.pair_work_qid, f.pair_work_wikidata_url)],
+    ['Artist', (f) => f.pair_artist_name || f.artist_name],
+    ['Work', (f) => f.pair_work_label || f.work_label],
+    ['Title in catalogue note', (f) => f.pair_note_work_title || f.note_work_title],
+    ['Date', (f) => f.pair_note_work_date || f.pair_work_year || f.note_work_date || f.work_year],
+    ['Collection', (f) => f.pair_collection || f.collection],
+    ['Location', (f) => f.pair_location || f.location || f.note_work_location],
+    ['Inventory number', (f) => f.pair_inventory_number || f.inventory_number],
+    ['Wikidata', (f) => {
+      const qid = f.pair_work_qid || f.work_qid;
+      return link(qid, f.pair_work_wikidata_url || (qid ? `https://www.wikidata.org/wiki/${qid}` : ''));
+    }],
+    ['Museum page', (f) => linkOnly('Object page', f.museum_object_page)],
     ['Image size', (f) => (f.original_full_width ? `${f.original_full_width} × ${f.original_full_height} px` : '')],
-    ['Image credit', (f) => f.original_image_credit],
-    ['Licence', (f) => link(f.original_image_license, f.original_image_license_url)],
+    ['Image credit', (f) => f.original_image_credit || f.commons_artist],
+    ['Licence', (f) => link(f.original_image_license || f.commons_license, f.original_image_license_url)],
     ['Image source', (f) => linkOnly('Wikimedia Commons', f.original_commons_page)],
-    ['Pair match', (f) => (f.pair_match_status ? `${f.pair_match_status} (score ${f.pair_match_score}), ${f.pair_review_status}` : '')],
+    ['Pair match', (f) => {
+      const status = f.pair_match_status || f.match_status;
+      if (!status) return '';
+      const score = f.pair_match_score || f.match_score;
+      const review = f.pair_review_status || f.review_status;
+      return `${status}${score ? ` (score ${score})` : ''}${review ? `, ${review}` : ''} – machine-generated`;
+    }],
   ],
   photochrom: [
     ['Photochrom number', (f) => f.photochrom_number],
@@ -34,7 +50,7 @@ const KEY_FIELDS = {
     ['Date', (f) => f.photochrom_date_of_publication_or_production || f.date],
     ['Depicted place', (f) => f.place],
     ['Publisher', (f) => f.photochrom_publisher_or_producer],
-    ['Place', (f) => f.photochrom_place_of_publication_or_production],
+    ['Place of publication', (f) => f.photochrom_place_of_publication_or_production],
     ['Physical description', (f) => f.photochrom_physical_description],
     ['Call number', (f) => f.photochrom_library_call_number],
     ['People', (f) => list(f.photochrom_person).map(stripAuthorityIds)],
@@ -44,6 +60,12 @@ const KEY_FIELDS = {
     ['IIIF manifest', (f) => linkOnly('Manifest', f.photochrom_iiif_manifest_url || f.iiif_manifest)],
     ['Rights', (f) => [f.photochrom_digital_reproduction_rights_owner, rightsLabel(f.photochrom_digital_reproduction_copyright)].filter(Boolean).join(', ')],
     ['Catalog record', (f) => linkOnly('swisscollections', f.record)],
+    // How the pair was found (Candidates tab: candidates.csv or the painting match).
+    ['Pair', (f) => {
+      if (f.pair_method) return `${f.pair_method}${f.pair_score ? ` (score ${f.pair_score})` : ''}${f.pair_review_status ? `, ${f.pair_review_status}` : ''} – machine-generated`;
+      if (f.match_status) return `Painting match: ${f.match_status}${f.review_status ? `, ${f.review_status}` : ''} – machine-generated`;
+      return '';
+    }],
   ],
   // Images loaded from a link (Wikimedia Commons, e-rara items outside the library).
   external: [
@@ -94,7 +116,7 @@ function appendValue(parent, value) {
   }
 }
 
-function definitionList(entries, className) {
+export function definitionList(entries, className) {
   const dl = document.createElement('dl');
   dl.className = className;
   for (const [label, value] of entries) {
@@ -111,19 +133,21 @@ function definitionList(entries, className) {
 /**
  * Metadata of one image: curated key fields plus a disclosure with every column.
  * @param image  one side of a pair ({ role, fields })
+ * @param skip   labels of key fields shown elsewhere (e.g. by the catalog block)
+ * @param emptyText  shown when there are no key fields (null: show nothing)
  */
-export function metadataSection(image) {
+export function metadataSection(image, { skip = new Set(), emptyText = 'No metadata available.' } = {}) {
   const section = document.createElement('div');
-  section.className = 'cmp-meta';
+  section.className = 'meta';
 
   const fields = image.fields ?? {};
-  const keyEntries = (KEY_FIELDS[image.role] ?? []).map(([label, get]) => [label, get(fields)]);
+  const keyEntries = (KEY_FIELDS[image.role] ?? []).filter(([label]) => !skip.has(label)).map(([label, get]) => [label, get(fields)]);
   const allEntries = Object.entries(fields)
     .filter(([, v]) => v !== '')
     .map(([key, v]) => [key, v.includes('###') ? list(v) : v]);
 
   if (keyEntries.some(([, v]) => !isEmpty(v))) section.append(definitionList(keyEntries, 'meta-key'));
-  else section.append(Object.assign(document.createElement('p'), { className: 'placeholder', textContent: 'No metadata available.' }));
+  else if (emptyText) section.append(Object.assign(document.createElement('p'), { className: 'placeholder', textContent: emptyText }));
 
   if (allEntries.length) {
     const details = document.createElement('details');

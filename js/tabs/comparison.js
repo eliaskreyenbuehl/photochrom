@@ -4,6 +4,8 @@
 // with metadata, and color analysis. Sub-modules live in js/tabs/comparison/.
 
 import { DEFAULT_PAIR_ID } from '../config.js';
+import { icon } from '../lib/ui/icons.js';
+import { infoTip } from '../lib/ui/info.js';
 import { loadCatalog } from '../lib/catalog.js';
 import { imageName } from '../lib/sources/index.js';
 import { isCropping, printAreaFor } from '../lib/print-area.js';
@@ -16,7 +18,7 @@ import { createImagePicker } from './comparison/image-picker.js';
 import { loadDisplayImage, releaseImage } from './comparison/media.js';
 import { loadSamplePairs } from './comparison/pairs.js';
 import { saveScreenshot } from './comparison/screenshot.js';
-import { POSITION, SIDES, VIEW_LABELS, baseImage, defaultManual, initialPairState, overlayImage, store, subscribe, update } from './comparison/store.js';
+import { POSITION, SIDES, VIEW_ICONS, VIEW_LABELS, baseImage, defaultManual, initialPairState, overlayImage, store, subscribe, update } from './comparison/store.js';
 import { createViewer } from './comparison/viewer.js';
 
 let els = null;
@@ -167,24 +169,27 @@ export default {
 
   render(container) {
     container.innerHTML = `
-      <h2>Image Comparison</h2>
+      <h2 class="visually-hidden">Image Comparison</h2>
       <div class="cmp-toolbar">
         <div class="cmp-pickers"></div>
         <fieldset class="segmented">
-          <legend>View</legend>
+          <legend class="visually-hidden">View</legend>
           ${Object.entries(VIEW_LABELS).map(
             ([value, label]) => `
             <label>
               <input type="radio" name="cmp-view" value="${value}"${value === store.view ? ' checked' : ''}>
-              <span>${label}</span>
+              <span>${icon(VIEW_ICONS[value])}${label}</span>
             </label>`
           ).join('')}
         </fieldset>
-        <label class="control cmp-crop" title="Show and analyze only the photochrom print, without color chart, gray scale and scan border (data/print-area.csv)">
-          <input type="checkbox" name="cmp-crop" checked>
-          <span>Crop to print</span>
-        </label>
-        <button type="button" class="button" data-action="screenshot" disabled>Save screenshot</button>
+        <span class="cmp-crop">
+          <label class="check">
+            <input type="checkbox" name="cmp-crop" checked>
+            <span>Crop to print</span>
+          </label>
+          ${infoTip('Show and analyze only the photochrom print, without color chart, gray scale and scan border. The box comes from <code>data/print-area.csv</code> (machine-generated, unreviewed; about 1 in 10 is imperfect). Untick to see the whole scan.', 'About Crop to print')}
+        </span>
+        <button type="button" class="btn" data-action="screenshot" disabled title="Save the current view as PNG, with credits">${icon('camera')}<span class="btn-label">Screenshot</span></button>
       </div>
       <p class="cmp-status" role="status" aria-live="polite"></p>
       <div class="cmp-layout" hidden>

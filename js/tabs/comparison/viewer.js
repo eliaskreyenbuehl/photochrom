@@ -15,33 +15,23 @@
 // and Ctrl/⌘ + scroll always zoom the view, Shift/Alt + scroll only ever act on
 // the overlay.
 
+import { openDetails } from '../../lib/ui/details.js';
+import { icon } from '../../lib/ui/icons.js';
+import { infoTip } from '../../lib/ui/info.js';
 import { filterString } from './adjustments.js';
-import { createImageDialog } from './image-dialog.js';
 import { multiply, scaling, toCssMatrix3d, translation } from './geometry.js';
 import { DIFF_BASE_FILTER } from './difference.js';
 import { SIDES, baseImage, otherSide, overlayImage, overlayMatrix, setManual, store, subscribe, update } from './store.js';
-import { MAX_ZOOM, MIN_ZOOM, clampZoom, createZoom } from './zoom.js';
+import { MAX_ZOOM, MIN_ZOOM, clampZoom, createZoom } from '../../lib/ui/zoom.js';
 
 const ZOOM_HINT = 'Pinch or Ctrl/⌘ + scroll to zoom, double-click to zoom in (Shift: out), 0 to fit.';
 
 const HINTS = {
-  side: 'Choose the images with the search fields at the top (media library, or a pasted Wikimedia Commons / e-rara link). Double-click an image (or click its title) to see it in full with all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together; turn it off to adjust one image, then on again to keep that offset.',
+  side: 'Choose the images with the search fields at the top (media library, or a pasted Wikimedia Commons / e-rara link). Double-click an image (or click its title) for its details: the full image and all its metadata. Pinch or Ctrl/⌘ + scroll to zoom, drag to pan, 0 to fit. With "Link" on, both images zoom and pan together; turn it off to adjust one image, then on again to keep that offset.',
   'overlay-move': `Move overlay: drag to move it, Shift + scroll scales, Alt + scroll rotates; with the image focused, arrow keys move, + / − scale, [ / ] rotate (Shift: larger steps). Hold Space or switch to Pan (H) to drag the view. ${ZOOM_HINT}`,
   'overlay-pan': `Pan: drag to move the view, arrow keys pan. Switch to Move overlay (V) to align. ${ZOOM_HINT}`,
   slider: `Drag the divider line (or press ← →) to compare; drag anywhere else to pan. ${ZOOM_HINT}`,
   diff: `Red areas: the image structure differs between the aligned images (e.g. added, removed or changed content). Gray tint: outside the overlap, not compared. Align the images first. Drag to pan. ${ZOOM_HINT}`,
-};
-
-const svg = (d) =>
-  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
-
-const ICONS = {
-  move: svg('M8 1.5v13M1.5 8h13M8 1.5 6.2 3.3M8 1.5l1.8 1.8M8 14.5l-1.8-1.8M8 14.5l1.8-1.8M1.5 8l1.8-1.8M1.5 8l1.8 1.8M14.5 8l-1.8-1.8M14.5 8l-1.8 1.8'),
-  pan: svg('M5.5 8.5V3.8a1 1 0 0 1 2 0V7.5M7.5 7V2.8a1 1 0 0 1 2 0V7.5M9.5 7.5V3.8a1 1 0 0 1 2 0V8M11.5 8V6a1 1 0 0 1 2 0v4a4.5 4.5 0 0 1-4.5 4.5H8.3a4 4 0 0 1-3.1-1.5L2.6 9.8a1 1 0 0 1 1.5-1.3l1.4 1.4V8.5'),
-  minus: svg('M3.5 8h9'),
-  plus: svg('M3.5 8h9M8 3.5v9'),
-  fit: svg('M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4'),
-  link: svg('M6.5 9.5l3-3M7.2 4.6 8.4 3.4a2.6 2.6 0 0 1 3.7 3.7L10.9 8.3M8.8 11.4l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7l1.2-1.2'),
 };
 
 export function createViewer() {
@@ -50,23 +40,26 @@ export function createViewer() {
   root.innerHTML = `
     <div class="cmp-viewer-toolbar" role="toolbar" aria-label="View tools">
       <div class="cmp-toolset" data-only="overlay" role="group" aria-label="Mouse tool">
-        <button type="button" class="cmp-tool" data-tool="move" aria-pressed="true" title="Drag moves the overlay (V)">${ICONS.move}<span>Move overlay</span></button>
-        <button type="button" class="cmp-tool" data-tool="pan" aria-pressed="false" title="Drag pans the view (H, or hold Space)">${ICONS.pan}<span>Pan</span></button>
+        <button type="button" class="btn btn-ghost" data-tool="move" aria-pressed="true" title="Drag moves the overlay (V)">${icon('move')}<span class="btn-label">Move overlay</span></button>
+        <button type="button" class="btn btn-ghost" data-tool="pan" aria-pressed="false" title="Drag pans the view (H, or hold Space)">${icon('pan')}<span class="btn-label">Pan</span></button>
       </div>
       <div class="cmp-toolset" role="group" aria-label="Zoom">
-        <button type="button" class="cmp-tool" data-zoom="out" aria-label="Zoom out" title="Zoom out">${ICONS.minus}</button>
+        <button type="button" class="btn btn-ghost btn-icon" data-zoom="out" aria-label="Zoom out" title="Zoom out (−)">${icon('minus')}</button>
         <output class="cmp-zoom-level" aria-label="Zoom level">1×</output>
-        <button type="button" class="cmp-tool" data-zoom="in" aria-label="Zoom in" title="Zoom in">${ICONS.plus}</button>
-        <button type="button" class="cmp-tool" data-zoom="fit" title="Fit to the view (0)">${ICONS.fit}<span>Fit</span></button>
+        <button type="button" class="btn btn-ghost btn-icon" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${icon('plus')}</button>
+        <button type="button" class="btn btn-ghost" data-zoom="fit" title="Fit to the view (0)">${icon('fit')}<span class="btn-label">Fit</span></button>
       </div>
-      <button type="button" class="cmp-tool" data-only="side" data-action="link" aria-pressed="true" title="Zoom and pan both images together">${ICONS.link}<span>Link</span></button>
+      <span class="cmp-toolbar-end">
+        <button type="button" class="btn btn-ghost" data-only="side" data-action="link" aria-pressed="true" title="Zoom and pan both images together">${icon('link')}<span class="btn-label">Link</span></button>
+        ${infoTip('<span class="cmp-hint-text"></span>', 'How to use this view')}
+      </span>
     </div>
     <div class="cmp-side-view" data-only="side">
       ${SIDES.map(
         (side) => `
         <figure class="cmp-figure" data-side="${side}">
           <div class="cmp-frame" tabindex="0"><div class="cmp-zoom"></div></div>
-          <figcaption><button type="button" class="cmp-title" aria-haspopup="dialog" title="Show the full image and its metadata"></button> <span class="cmp-year"></span></figcaption>
+          <figcaption><button type="button" class="cmp-title" aria-haspopup="dialog" title="Show the details: full image and all metadata (or double-click the image)"></button> <span class="cmp-year"></span></figcaption>
         </figure>`
       ).join('')}
     </div>
@@ -81,7 +74,7 @@ export function createViewer() {
       </div>
       <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true"></span></div>
     </div>
-    <p class="cmp-stage-hint" id="cmp-stage-hint"></p>
+    <p class="visually-hidden" id="cmp-stage-hint"></p>
   `;
 
   const $ = (sel) => root.querySelector(sel);
@@ -92,7 +85,8 @@ export function createViewer() {
   const diffCanvas = $('.cmp-diff-layer');
   const diffBoxes = $('.cmp-diff-boxes');
   const divider = $('.cmp-divider');
-  const hint = $('.cmp-stage-hint');
+  const hint = $('#cmp-stage-hint');
+  const hintTip = $('.cmp-hint-text');
   const zoomLevel = $('.cmp-zoom-level');
   const linkButton = $('[data-action="link"]');
   const frame = (side) => root.querySelector(`.cmp-figure[data-side="${side}"] .cmp-frame`);
@@ -244,13 +238,16 @@ export function createViewer() {
       const fig = root.querySelector(`.cmp-figure[data-side="${side}"]`);
       fig.querySelector('.cmp-title').textContent = image.label; // number + title
       fig.querySelector('.cmp-year').textContent = image.year ?? '';
-      frame(side).setAttribute('aria-label', `${image.position} image: ${image.label}. Zoomable; press Enter for the full image and metadata.`);
+      frame(side).setAttribute('aria-label', `${image.position} image: ${image.label}. Zoomable; press Enter for details.`);
     }
   }
 
   function updateHint() {
     const text = HINTS[store.view === 'overlay' ? `overlay-${tool}` : store.view];
-    if (hint.textContent !== text) hint.textContent = text;
+    if (hint.textContent !== text) {
+      hint.textContent = text;
+      hintTip.textContent = text;
+    }
   }
 
   /** Base size and stage height of the previous layout (to keep the zoomed region). */
@@ -524,10 +521,8 @@ export function createViewer() {
   stage.addEventListener('blur', releaseSpace);
 
   // Side-by-side frames: Panzoom handles the pointer itself; add keyboard zoom and
-  // the image dialog (double-click, Enter, or the title button).
-  const imageDialog = createImageDialog();
-  root.append(imageDialog.element);
-  const openDialog = (side) => store.images[side] && imageDialog.open(store.images[side]);
+  // the details dialog (double-click, Enter, or the title button).
+  const openDialog = (side) => store.images[side] && openDetails(store.images[side]);
   for (const side of SIDES) {
     const el = frame(side);
     el.addEventListener('pointerdown', () => el.focus({ preventScroll: true }));
