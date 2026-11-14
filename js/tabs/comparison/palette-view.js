@@ -1,10 +1,11 @@
-// Palette display of the color analysis: proportional strip, swatch list, an image
-// preview in which a clicked palette color is highlighted, and copy buttons
-// (hex values as text, or the palette as PNG image).
+// Palette display of the color analysis: proportional color bar (hex + share in
+// each block, per-color copy), an image preview in which a clicked palette color
+// is highlighted, and copy buttons (hex values as text, or the palette as PNG).
+// The palettes are computed by analysis.js, which also uses them for the plots;
+// a selection is reported back via onSelect so the plot can highlight it too.
 
 import { canvasToBlob, downloadBlob } from '../../lib/download.js';
 import { createCanvas } from './media.js';
-import { assignPixels, extractPalette } from './palette.js';
 
 const SWATCH = 120; // px per color in the copied palette image
 
@@ -82,12 +83,11 @@ function button(text, action) {
 
 /**
  * One palette block.
- * @param entry { label, image (analyzeImage result), fileStem }
+ * @param entry { label, image (analyzeImage result), fileStem, palette, assign, onSelect }
+ *   assign: palette index per analysed pixel; onSelect(index) with -1 for "none"
  */
-function paletteBlock(entry, k) {
-  const { label, image, fileStem } = entry;
-  const palette = extractPalette(image, k);
-  let assign = null;
+function paletteBlock(entry) {
+  const { label, image, fileStem, palette, assign, onSelect } = entry;
   let selected = -1;
 
   const block = document.createElement('div');
@@ -147,11 +147,11 @@ function paletteBlock(entry, k) {
 
   function select(i) {
     selected = selected === i ? -1 : i;
-    assign ??= assignPixels(image, palette);
     const share = renderPreview(preview, image, assign, selected);
     bar.querySelectorAll('.palette-swatch').forEach((el) => el.setAttribute('aria-pressed', String(Number(el.dataset.index) === selected)));
     preview.setAttribute('aria-label', selected < 0 ? label : `${label}, pixels closest to ${palette[selected].hex} highlighted`);
-    say(selected < 0 ? '' : `Highlighted ${palette[selected].hex}: ${(share * 100).toFixed(1)} % of the pixels.`);
+    say(selected < 0 ? '' : `Highlighted ${palette[selected].hex}: ${(share * 100).toFixed(1)} % of the pixels (also in the plot above).`);
+    onSelect?.(selected);
   }
 
   async function copyHex() {
@@ -209,9 +209,9 @@ export function createPaletteView() {
   root.className = 'analysis-palettes';
   return {
     element: root,
-    /** entries: [{ label, image, fileStem }] */
-    update(entries, k) {
-      root.replaceChildren(...entries.map((entry) => paletteBlock(entry, k)));
+    /** entries: [{ label, image, fileStem, palette, assign, onSelect }] */
+    update(entries) {
+      root.replaceChildren(...entries.map(paletteBlock));
     },
   };
 }
