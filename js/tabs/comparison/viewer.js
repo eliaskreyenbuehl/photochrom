@@ -242,9 +242,9 @@ export function createViewer() {
     for (const side of SIDES) {
       const image = store.images[side];
       const fig = root.querySelector(`.cmp-figure[data-side="${side}"]`);
-      fig.querySelector('.cmp-title').textContent = image.title || image.label;
+      fig.querySelector('.cmp-title').textContent = image.label; // number + title
       fig.querySelector('.cmp-year').textContent = image.year ?? '';
-      frame(side).setAttribute('aria-label', `${image.label}: ${image.title ?? ''}. Zoomable; press Enter for the full image and metadata.`);
+      frame(side).setAttribute('aria-label', `${image.position} image: ${image.label}. Zoomable; press Enter for the full image and metadata.`);
     }
   }
 

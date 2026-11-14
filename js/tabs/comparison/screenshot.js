@@ -122,8 +122,9 @@ function withCaption(image, detail) {
   measure.font = `${font}px system-ui, sans-serif`;
   const blend = store.view === 'overlay' && store.differenceBlend ? ', difference blend' : '';
   const name = `${VIEW_LABELS[store.view]}${blend}${detail ? ' (zoomed detail)' : ''}`;
-  const view = store.view === 'side' ? name : `${name}: ${overlayImage().label} on ${baseImage().label}`;
-  const texts = [`${store.pair.label} · ${view}`, ...SIDES.map((side) => `${store.images[side].label}: ${store.images[side].credit}`)];
+  const view = store.view === 'side' ? name : `${name}: ${overlayImage().position.toLowerCase()} image on ${baseImage().position.toLowerCase()} image`;
+  const credit = (image) => `${image.position}${image.number ? ` (No. ${image.number})` : ''}: ${image.credit}`;
+  const texts = [`${store.pair.label} · ${view}`, ...SIDES.map((side) => credit(store.images[side]))];
   const lines = texts.flatMap((t) => wrap(measure, t, image.width - 2 * pad));
 
   const canvas = createCanvas(image.width, image.height + lines.length * lineH + 2 * pad);

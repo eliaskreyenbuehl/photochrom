@@ -14,7 +14,8 @@ import { createDiffView } from './comparison/diffview.js';
 import { loadDisplayImage, releaseImage } from './comparison/media.js';
 import { loadArtworkPairs, loadSamplePairs } from './comparison/pairs.js';
 import { saveScreenshot } from './comparison/screenshot.js';
-import { SIDES, VIEW_LABELS, baseImage, defaultManual, initialPairState, overlayImage, store, subscribe, update } from './comparison/store.js';
+import { imageName } from './comparison/pairs.js';
+import { POSITION, SIDES, VIEW_LABELS, baseImage, defaultManual, initialPairState, overlayImage, store, subscribe, update } from './comparison/store.js';
 import { createViewer } from './comparison/viewer.js';
 
 let els = null;
@@ -59,16 +60,19 @@ async function withPrintArea(side) {
   }
 }
 
+/** "Left image", "Right image" or "Both images". */
+const whichImages = (imgs) => (imgs.length > 1 ? 'Both images' : `${imgs[0].position} image`);
+
 /** Status line after loading: say what was cropped, so nobody mistakes the crop for the scan. */
 function cropStatus(images) {
   const small = SIDES.map((s) => images[s]).filter((img) => img.fallback);
   const smallNote = small.length
-    ? `Full-size image of the ${small.map((img) => img.label).join(' and ')} not available yet, showing the 300 px thumbnail. `
+    ? `Full-size version of ${small.length > 1 ? 'both images' : `the ${small[0].position.toLowerCase()} image`} not available yet, showing the 300 px thumbnail. `
     : '';
   const cropped = SIDES.map((s) => images[s]).filter((img) => img.cropped);
   if (!cropped.length) return smallNote.trim();
   const check = cropped.some((img) => /check/.test(img.cropped.note || '')) ? ' This box is a fallback, please check it.' : '';
-  return `${smallNote}${cropped.map((img) => img.label).join(' and ')} cropped to the print: color chart and scan border removed (box machine-generated, unreviewed).${check} Untick "Crop to print" to see the whole scan.`;
+  return `${smallNote}${whichImages(cropped)} cropped to the print: color chart and scan border removed (box machine-generated, unreviewed).${check} Untick "Crop to print" to see the whole scan.`;
 }
 
 async function loadPair(pair) {
@@ -77,7 +81,9 @@ async function loadPair(pair) {
   setBusy(true);
   setStatus(`Loading ${pair.label}…`);
   try {
-    const sides = await Promise.all(SIDES.map((side) => withPrintArea(pair[side])));
+    // Every image gets its position ("Left"/"Right") and a display name (number + title).
+    const named = (side) => ({ ...pair[side], position: POSITION[side], label: pair[side].label || imageName(pair[side]) });
+    const sides = await Promise.all(SIDES.map((side) => withPrintArea(named(side))));
     const [left, right] = await Promise.all(sides.map((side) => loadDisplayImage(side, { crop: cropToPrint })));
     if (token !== loadToken) {
       releaseImage(left);
@@ -88,7 +94,8 @@ async function loadPair(pair) {
     update({ pair, ...initialPairState({ left, right }) }, 'pair');
     SIDES.forEach((side) => previous[side] !== store.images[side] && releaseImage(previous[side]));
     els.main.hidden = false;
-    analysis.setSources({ id: pair.id, left: { label: left.label, img: left.img }, right: { label: right.label, img: right.img } });
+    const source = ({ label, position, number, img }) => ({ label, position, number, img });
+    analysis.setSources({ id: pair.id, left: source(left), right: source(right) });
     setStatus(cropStatus({ left, right }));
   } catch (err) {
     if (token !== loadToken) return;

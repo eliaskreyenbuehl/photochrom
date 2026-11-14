@@ -9,10 +9,12 @@
 //   {
 //     id: 'gleyre-le-soir',          // unique id, used in screenshot file names
 //     label: 'Gleyre – Le Soir',     // shown in the pair selector
-//     left:  { role, label, title, year, url, credit, creditUrl, fields },
-//     right: { role, label, title, year, url, credit, creditUrl, fields },
+//     left:  { role, label, number, title, year, url, credit, creditUrl, fields },
+//     right: { role, label, number, title, year, url, credit, creditUrl, fields },
 //   }
-//   role: 'original' | 'photochrom'; label: 'Original' / 'Photochrom';
+//   role: 'original' | 'photochrom' (selects the metadata fields; both sides may be photochroms)
+//   number: photochrom number, if any; label: display name, e.g. "No. 73 · Le soir"
+//     (optional, built from number + title by imageName() in comparison/pairs.js)
 //   title, year: shown under the image; fields: all metadata { column: value }
 
 const SELECTION_KEY = 'photochrom.selection.v1';

@@ -280,6 +280,7 @@ showTab('comparison');
 
 ### Image Comparison tab: how it works
 
+- **Naming images**: never by role ("Original"/"Photochrom") — a pair can be two photochroms. An image is named by its photochrom number (if any) and title, `imageName()` in `pairs.js`, e.g. "No. 73 · Les illusions perdues"; where that does not fit (selectors, legends, sentences about overlap) use its position "Left"/"Right" (`POSITION` in `store.js`, `image.position`). `role` only selects the metadata fields. The number comes from `photochrom_number` (sample CSV) or the catalog field `n`.
 - **State**: `comparison/store.js` holds the tab state. Change it only via `update(patch, reason)`; subscribers update only what the reason (`'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'blend' | 'divider' | 'adjust' | 'diff'`) affects — dragging the overlay fires `'transform'` on every pointer move, so that path must stay cheap (no layout reads, no DOM rebuilding).
 - **Per-view visibility**: the panel carries `data-view`; mark elements with `data-only="overlay slider"` etc. and CSS hides them in other views. Don't toggle `hidden` per view in JS.
 - **One geometric model**: a 3×3 homography `H` maps overlay *natural* pixels to base natural pixels. Auto-align sets `H`; manual move/scale/rotate is applied on top (`overlayMatrix()`). Swapping which image is on top inverts the matrix, so the alignment survives. All geometry is in natural pixels; convert to screen only at the edges (`geo.vs` × zoom).
