@@ -72,7 +72,7 @@ export function createViewer() {
           <div class="cmp-diff-boxes" data-only="diff"></div>
         </div>
       </div>
-      <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true"></span></div>
+      <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true">${icon('chevrons-lr')}</span></div>
     </div>
     <p class="visually-hidden" id="cmp-stage-hint"></p>
   `;
@@ -522,7 +522,9 @@ export function createViewer() {
 
   // Side-by-side frames: Panzoom handles the pointer itself; add keyboard zoom and
   // the details dialog (double-click, Enter, or the title button).
-  const openDialog = (side) => store.images[side] && openDetails(store.images[side]);
+  // The other image goes along, so annotations made there can document the comparison.
+  const openDialog = (side, { annotate = false } = {}) =>
+    store.images[side] && openDetails(store.images[side], { compareWith: store.images[otherSide(side)] ?? null, annotate });
   for (const side of SIDES) {
     const el = frame(side);
     el.addEventListener('pointerdown', () => el.focus({ preventScroll: true }));
@@ -588,6 +590,8 @@ export function createViewer() {
 
   return {
     element: root,
+    /** Open the details dialog of the left or right image; { annotate: true } scrolls to the annotation form. */
+    openDialog,
     /** Difference layer: heatmap canvas and container for the region boxes. */
     diffCanvas,
     diffBoxes,

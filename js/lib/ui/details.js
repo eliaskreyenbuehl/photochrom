@@ -3,6 +3,7 @@
 //
 //   openDetails(image)                                   // one image
 //   openDetails(image, { browse: { index, count, at } }) // with ← / → through a list
+//   openDetails(image, { compareWith: other })           // comparison tab: the other image
 //
 // `image` has the shape of js/lib/sources/image.js (key, role, label, title, year, url,
 // fallbackUrl, credit, creditUrl, fields, recordId) and optionally:
@@ -10,6 +11,8 @@
 //   position  'Left' | 'Right' (comparison tab)
 // Images of catalog records (recordId) also get the catalog block: date notes, genre,
 // description, image content, links, print area and the selection checkbox.
+// Every image gets the user's annotations (js/lib/ui/annotations.js): list, form, and
+// regions drawn on the zoomable image (js/lib/ui/region-layer.js).
 //
 // Layout: zoomable image | draggable divider | information. A native modal <dialog>
 // handles focus, Escape and the backdrop. The dialog lives in <body>, so it works
@@ -18,9 +21,11 @@
 import { dateLabel, doiUrl, escapeHtml, fullImageUrl, loadCatalog, recordUrl } from '../catalog.js';
 import { isCropping, printAreaFor } from '../print-area.js';
 import { isSelected, onSelectionChange, setSelected } from '../../state.js';
+import { annotationSection } from './annotations.js';
 import { icon } from './icons.js';
 import { infoTip } from './info.js';
 import { isUrl, metadataSection } from './metadata.js';
+import { createRegionLayer } from './region-layer.js';
 import { createZoom } from './zoom.js';
 
 const SPLIT_STEP = 32; // px per arrow key press on the divider (Shift: ×3)
@@ -42,7 +47,8 @@ const COVERED_BY_CATALOG = new Set(['Photochrom number', 'Title', 'Date', 'Depic
 let metaWidth = 420; // px, kept between openings
 let dialog = null;
 let parts = null;
-let current = null; // { image, rec, browse }
+let current = null; // { image, rec, browse, compareWith }
+let annotations = null; // annotation section of the current image ({ element, destroy })
 let loadToken = 0;
 
 function build() {
@@ -57,6 +63,7 @@ function build() {
         <p class="details-sub"></p>
       </div>
       <div class="details-actions">
+        <button type="button" class="btn" data-annotate title="Go to the annotations of this image (comments, tags, regions, microscope images)">${icon('note')}<span class="btn-label">Annotations</span></button>
         <label class="btn details-select" hidden><input type="checkbox"> <span>Selected</span></label>
         <div class="details-nav" role="group" aria-label="Browse" hidden>
           <button type="button" class="btn btn-icon" data-nav="-1" aria-label="Previous image" title="Previous image (←)">${icon('chevron-left')}</button>
@@ -96,7 +103,13 @@ function build() {
     info: $('.details-info'),
   };
   // No page to scroll behind a modal: plain scrolling zooms the image.
-  parts.zoom = createZoom(parts.content, { wheelZoom: true });
+  parts.zoom = createZoom(parts.content, {
+    wheelZoom: true,
+    // Region boxes keep their screen line width (calc(… * var(--inv-zoom))).
+    onChange: ({ scale }) => parts.content.style.setProperty('--inv-zoom', String(1 / scale)),
+    allowDblClick: (e) => !e.target.closest('.panzoom-exclude'), // not while drawing a region
+  });
+  parts.regions = createRegionLayer(parts.content);
 
   wireSplit();
   dialog.addEventListener('click', (e) => {
@@ -104,6 +117,7 @@ function build() {
     if (e.target === dialog || e.target.closest('[data-close]')) dialog.close();
     const nav = e.target.closest('[data-nav]');
     if (nav) browseBy(Number(nav.dataset.nav));
+    if (e.target.closest('[data-annotate]')) showAnnotations();
   });
   dialog.addEventListener('keydown', (e) => {
     const inViewer = e.target === parts.viewport || e.target === parts.split || e.target.matches('input, select, textarea');
@@ -121,6 +135,8 @@ function build() {
     document.documentElement.classList.remove('has-modal');
     loadToken++; // stop pending image loads
     current = null;
+    annotations?.destroy();
+    annotations = null;
   });
 }
 
@@ -189,6 +205,8 @@ function showImage(image, rec) {
     const img = image.img.cloneNode();
     img.alt = image.label || '';
     parts.content.replaceChildren(img);
+    // The comparison tab may show the photochrom cropped to the print; regions refer to the scan.
+    parts.regions.attach(img, image.cropped ?? null);
     return;
   }
   const big = rec ? fullImageUrl(rec, DETAIL_SIZE) : image.url;
@@ -198,10 +216,12 @@ function showImage(image, rec) {
   img.decoding = 'async';
   if (!big && !small) {
     parts.content.replaceChildren(Object.assign(document.createElement('p'), { className: 'details-noimg', textContent: 'No online image yet.' }));
+    parts.regions.attach(null);
     return;
   }
   img.src = small || big;
   parts.content.replaceChildren(img);
+  parts.regions.attach(img);
   if (!big || big === img.src) return;
   parts.imgStatus.textContent = 'Loading the larger image…';
   const full = new Image();
@@ -274,7 +294,10 @@ function linksBlock(rec) {
   return section('Links', fromHtml(`<p class="details-links">${links.join('')}</p>`));
 }
 
+let fillToken = 0;
+
 async function fillInfo(image, rec) {
+  const token = ++fillToken;
   const info = parts.info;
   info.replaceChildren();
   if (image.credit) {
@@ -286,7 +309,9 @@ async function fillInfo(image, rec) {
   }
   if (rec) {
     const catalog = await loadCatalog();
-    info.append(...await catalogBlock(rec, catalog));
+    const block = await catalogBlock(rec, catalog);
+    if (token !== fillToken) return; // another image was opened meanwhile
+    info.append(...block);
   }
   // Fields of the image's source (sample CSV, painting pairs, link sources), without
   // the ones the catalog block already shows; plus every raw column.
@@ -294,15 +319,26 @@ async function fillInfo(image, rec) {
   const keys = meta.querySelector('.meta-key');
   if (keys) info.append(section(rec ? 'More metadata' : 'Metadata', keys));
   if (rec) info.append(linksBlock(rec));
+  annotations?.destroy();
+  annotations = annotationSection({ image, compareWith: current?.compareWith ?? null, regions: parts.regions });
+  info.append(annotations.element);
   if (meta.childElementCount) info.append(meta);
 }
 
-async function show(image, browse) {
+/** Scroll the information panel to the annotations and put the cursor in the comment field. */
+function showAnnotations() {
+  const target = annotations?.element;
+  if (!target?.isConnected) return;
+  target.scrollIntoView({ block: 'start' });
+  target.querySelector('textarea')?.focus({ preventScroll: true });
+}
+
+async function show(image, browse, compareWith = null) {
   let rec = null;
   if (image.recordId) {
     try { rec = (await loadCatalog()).byId.get(String(image.recordId)) ?? null; } catch { rec = null; }
   }
-  current = { image, rec, browse };
+  current = { image, rec, browse, compareWith };
   parts.kicker.textContent = image.position ? `${image.position} image` : (rec ? 'Photochrom' : '');
   parts.kicker.hidden = !parts.kicker.textContent;
   parts.title.textContent = image.label || image.title || 'Untitled';
@@ -325,8 +361,10 @@ async function show(image, browse) {
 /**
  * Open the details of one image.
  * @param browse  optional { index, count, at(i) -> image }: previous / next buttons and ← →
+ * @param compareWith  optional other image of a comparison: new annotations can link it
+ * @param annotate  scroll to the annotation form after opening
  */
-export async function openDetails(image, { browse = null } = {}) {
+export async function openDetails(image, { browse = null, compareWith = null, annotate = false } = {}) {
   if (!dialog) build();
   if (!dialog.open) {
     document.documentElement.classList.add('has-modal');
@@ -334,5 +372,6 @@ export async function openDetails(image, { browse = null } = {}) {
     setMetaWidth(metaWidth);
     dialog.querySelector('[data-close]').focus();
   }
-  await show(image, browse);
+  await show(image, browse, compareWith);
+  if (annotate) showAnnotations();
 }

@@ -1,6 +1,8 @@
 # Plan: user-generated data (comments, tags, microscope images)
 
-Status: proposal, 14.11.2026. Nothing of this is built yet.
+Status (14.11.2026): steps 1–5 built, see [annotations.md](annotations.md) for the format,
+storage and UI as implemented. Step 6 (hand-over) is the format description there. Not built:
+tags in the Candidates tab (UI item 5).
 
 ## Goal
 

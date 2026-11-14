@@ -76,9 +76,10 @@ Output and extensions:
 - **Display image metadata** (loaded via seperate local csv)
 - **Allow for image manipulation** (brightness, saturation, etc.)
 
+- **Annotations** (user data, [docs/annotations.md](docs/annotations.md)): comments, tags, a region (rectangle drawn on the image) and microscope images per image, with the annotator's name and time, as W3C Web Annotations. Written in the details dialog (every tab; here the sidebar group "Annotations" opens it for the left or right image, and the other image is linked as second target). Saved in a local folder (Chrome/Edge, File System Access API) or in the browser (IndexedDB); export/import as ZIP. Never in the repo.
+
 tbd for later:
 
-- **Add comments?**
 - **Update metadata?**
 
 Image Overlay:
@@ -200,16 +201,21 @@ js/lib/opencv.js          loadOpenCV(): lazy-loads OpenCV.js (~10 MB) for auto-a
 js/lib/script.js          loadScript(url): inject a classic <script> once (used by the loaders above)
 js/lib/download.js        canvasToBlob(), downloadBlob() — saving generated PNGs
 js/lib/exchange.js        export/import of the selection (CSV, JSON)
+js/lib/annotation-model.js  user annotations as W3C Web Annotations: build/read the JSON (docs/annotations.md)
+js/lib/annotation-store.js  annotation storage: local folder (File System Access API) or IndexedDB, media files, ZIP export/import
+js/lib/zip.js             minimal ZIP writer/reader (no library) for the annotation export
 js/lib/ui/                UI components shared by all tabs (see "UI conventions" below)
   icons.js                  icon(name): inline SVG icons, one style
   info.js                   infoTip(text): small "i" button with a popover for help text
-  details.js                openDetails(image): details dialog (zoomable image + all metadata), the same in every tab
+  details.js                openDetails(image): details dialog (zoomable image + all metadata + annotations), the same in every tab
+  annotations.js            annotation list + form of the dialog, storage panel (folder, export/import)
+  region-layer.js           rectangles over the dialog image: show annotation regions, draw a new one
   metadata.js               key fields per role (photochrom / original / external) + all fields of an image
   zoom.js                   pan & zoom (pinch, Ctrl/⌘ + scroll, double-click, keys) on top of Panzoom
   select-open.js            click selects, double-click / Enter opens (tiles, rows, cards)
   selection-bar.js          selection bar at the bottom of Media Library and Candidates
 js/lib/sources/           image sources (fetch layer): where images come from, independent of the UI
-  index.js                  registry: searchImages(), imageFromLink(), parseLink() — the only module the UI uses
+  index.js                  registry: searchImages(), imageFromLink(), parseLink(), canonicalUrl() (stable address of a work, annotation target) — the only module the UI uses
   image.js                  shared image shape (documented there), imageName(), stripHtml(), fetchJson()
   catalog.js                media library (catalog.json, thumbnails, e-rara IIIF, Hugging Face 2K scans): search, own links
   erara.js                  e-rara items outside the library (IIIF manifest / image service)
@@ -338,4 +344,5 @@ Keep the three tabs consistent; reuse the shared pieces instead of writing tab-s
 - **Click vs. double-click**: a double-click fires two clicks first. `select-open.js` toggles on the first click (`detail === 1`), ignores the second and undoes the toggle on `dblclick`, so a double-click only opens details. Update selected state in place (no re-render between the clicks) so the dblclick target survives.
 - **Opening a dialog with Enter**: call `preventDefault()` on the keydown, or the same key press activates the button that receives focus in the dialog (closing it again).
 - **Clipboard**: `navigator.clipboard.write` with images needs a secure context, a user gesture and `ClipboardItem` support. Always offer a fallback (show the text / download the PNG).
+- **Annotations / File System Access API**: `showDirectoryPicker()` and `requestPermission()` need a click (transient user activation): call them from the click handler with no slow work before. The handle survives in IndexedDB, the permission often not (Chrome asks again after a restart: "Allow access"). Firefox and Safari have no API, so they use IndexedDB plus ZIP. Headless tests can stand in a folder with the origin private file system: `window.showDirectoryPicker = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('x', { create: true })`. Regions are stored relative to the whole scan; the comparison tab's dialog shows the print crop, so `region-layer.js` maps through `image.cropped`.
 - **Testing interaction**: there is no test runner. Serve the folder and drive headless Chrome via the DevTools protocol (`Input.dispatchMouseEvent` / `dispatchTouchEvent` / `dispatchKeyEvent` give real pointer, wheel, pinch and key events). Use a fresh profile per run (Chrome caches ES modules aggressively), and remember that `+` in a URL query decodes to a space. Headless Chrome has no clipboard and cannot go below ~500 px window width.
