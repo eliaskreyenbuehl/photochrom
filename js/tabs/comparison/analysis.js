@@ -37,7 +37,7 @@ const state = {
   selected: { left: -1, right: -1 }, // palette color picked in each image's palette
 };
 
-let sources = null; // { id, left: { label, img }, right: { label, img } }
+let sources = null; // { id, left: { label, position, number, img }, right: { … } }
 let images = { left: null, right: null }; // analyzeImage() results for `sources`
 let paletteData = { left: null, right: null }; // { palette, assign } per image for state.paletteSize
 let els = null;
@@ -144,12 +144,16 @@ export function render(container) {
   updateDescription();
 }
 
-/** Set the images to analyse: { id, left: { label, img }, right: { label, img } }. */
+/** Short series name for plot legends and hover: "Left", "Right · No. 73". */
+const seriesName = ({ position, number }) => [position, number && `No. ${number}`].filter(Boolean).join(' · ');
+
+/** Set the images to analyse: { id, left: { label, position, number, img }, right: { … } }. */
 export function setSources(next) {
   sources = next;
   for (const side of SIDES) {
-    const label = els.section.querySelector(`input[value="${side}"] + span`);
-    label.textContent = next[side].label;
+    const span = els.section.querySelector(`input[value="${side}"] + span`);
+    span.textContent = next[side].position;
+    span.title = next[side].label; // full name on hover
   }
   analyse();
 }
@@ -210,7 +214,7 @@ function currentSeries() {
   return sides
     .filter((side) => images[side])
     .map((side) => ({
-      label: sources[side].label,
+      label: seriesName(sources[side]),
       color: SERIES_COLORS[side],
       symbol: SERIES_SYMBOLS[side],
       image: images[side],
@@ -278,7 +282,7 @@ function drawPalettes() {
   state.selected = { left: -1, right: -1 };
   palettes.update(
     sides.map((side) => ({
-      label: sources[side].label,
+      label: `${sources[side].position} · ${sources[side].label}`,
       image: images[side],
       fileStem: `${sources.id}-${side}`,
       ...paletteData[side],

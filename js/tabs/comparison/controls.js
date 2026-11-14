@@ -147,11 +147,14 @@ export function createControls({ onAutoAlign }) {
     const base = baseImage();
     const overlay = overlayImage();
     const { baseCovered, overlayInside } = overlapStats(overlayMatrix(), overlay.natW, overlay.natH, base.natW, base.natH);
-    overlapItems[0].textContent = `${overlay.label} covers ${pct(baseCovered)} of the ${base.label.toLowerCase()}`;
-    overlapItems[1].textContent = `${pct(overlayInside)} of the ${overlay.label.toLowerCase()} lies within the ${base.label.toLowerCase()}`;
+    // Positions, not names: the sentences must read the same for any pair of images.
+    const top = `${overlay.position.toLowerCase()} image`;
+    const under = `${base.position.toLowerCase()} image`;
+    overlapItems[0].textContent = `The ${top} covers ${pct(baseCovered)} of the ${under}`;
+    overlapItems[1].textContent = `${pct(overlayInside)} of the ${top} lies within the ${under}`;
     let message;
-    if (baseCovered < 0.9 && overlayInside >= 0.9) message = `The ${overlay.label.toLowerCase()} shows only a part (≈ ${pct(baseCovered)}) of the ${base.label.toLowerCase()}: it is cropped.`;
-    else if (overlayInside < 0.9 && baseCovered >= 0.9) message = `The ${base.label.toLowerCase()} shows only a part (≈ ${pct(overlayInside)}) of the ${overlay.label.toLowerCase()}: it is cropped.`;
+    if (baseCovered < 0.9 && overlayInside >= 0.9) message = `The ${top} shows only a part (≈ ${pct(baseCovered)}) of the ${under}: it is cropped.`;
+    else if (overlayInside < 0.9 && baseCovered >= 0.9) message = `The ${under} shows only a part (≈ ${pct(overlayInside)}) of the ${top}: it is cropped.`;
     else if (baseCovered < 0.9 && overlayInside < 0.9) message = 'The images only partly overlap.';
     else message = 'Both images show essentially the same section.';
     if (!isAligned()) message += ' Not aligned yet: run Auto-align (or align manually) for meaningful numbers.';
@@ -183,10 +186,14 @@ export function createControls({ onAutoAlign }) {
     if (reason === 'pair' || reason === 'swap') {
       const select = input('overlay-side');
       select.replaceChildren(
-        ...SIDES.map((side) => new Option(`${store.images[side].label} over ${store.images[otherSide(side)].label.toLowerCase()}`, side))
+        ...SIDES.map((side) => new Option(`${store.images[side].position} over ${store.images[otherSide(side)].position.toLowerCase()}`, side))
       );
       select.value = store.overlaySide;
-      for (const side of SIDES) root.querySelector(`input[name="adjust-side"][value="${side}"] + span .cmp-adjust-label`).textContent = store.images[side].label;
+      for (const side of SIDES) {
+        const label = root.querySelector(`input[name="adjust-side"][value="${side}"] + span .cmp-adjust-label`);
+        label.textContent = store.images[side].position;
+        label.closest('label').title = store.images[side].label; // full name on hover
+      }
     }
     if (reason === 'pair') {
       setAlignStatus('');
@@ -233,7 +240,7 @@ export function createControls({ onAutoAlign }) {
         summary.textContent = 'The images do not overlap; align them first.';
         return;
       }
-      summary.textContent = `Changed: ${pct(changedShare)} of the compared area (${pct(comparedShare)} of the ${baseImage().label.toLowerCase()} overlaps). ${regions.length ? 'Largest regions:' : 'No distinct regions at this sensitivity.'}`;
+      summary.textContent = `Changed: ${pct(changedShare)} of the compared area (${pct(comparedShare)} of the ${baseImage().position.toLowerCase()} image overlaps). ${regions.length ? 'Largest regions:' : 'No distinct regions at this sensitivity.'}`;
       regions.forEach((r) => list.append(Object.assign(document.createElement('li'), { textContent: `${r.where}: ${pct(r.share)} of the compared area` })));
     },
     setDiffBusy(busy) {

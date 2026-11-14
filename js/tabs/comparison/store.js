@@ -8,6 +8,8 @@ import { defaultAdjustments } from './adjustments.js';
 import { apply, identity, multiply, rotation, scaling, translation } from './geometry.js';
 
 export const SIDES = ['left', 'right'];
+/** Short names of the two images, used where a full name does not fit. */
+export const POSITION = { left: 'Left', right: 'Right' };
 
 export const VIEW_LABELS = { side: 'Side by side', overlay: 'Overlay', slider: 'Slider', diff: 'Differences' };
 

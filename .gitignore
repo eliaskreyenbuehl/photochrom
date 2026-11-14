@@ -13,3 +13,4 @@ node_modules/
 Thumbs.db
 # exception: small sample for development
 !data/sample/*.jpg
+tests/*
