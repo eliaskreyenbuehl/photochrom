@@ -72,7 +72,7 @@ export function createViewer() {
           <div class="cmp-diff-boxes" data-only="diff"></div>
         </div>
       </div>
-      <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true"></span></div>
+      <div class="cmp-divider" data-only="slider"><span class="cmp-divider-grip" aria-hidden="true">${icon('chevrons-lr')}</span></div>
     </div>
     <p class="visually-hidden" id="cmp-stage-hint"></p>
   `;

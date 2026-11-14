@@ -1021,17 +1021,10 @@ input:disabled { color: var(--muted); }
   height: 2rem;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-}
-
-#panel-comparison .cmp-divider-grip::before {
-  content: "\2039\00a0\203A";
-  position: absolute;
-  inset: 0;
   display: grid;
   place-items: center;
-  font-size: 1rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.35);
   color: var(--fg);
 }
 
