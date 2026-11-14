@@ -56,6 +56,7 @@ photochrom/
   and an overlay of art reproductions on the paintings they copy (drag, rotate, fade, difference blending).
   Repo: https://github.com/NbtKmy/glamhack2026_photochrom, live: https://nbtkmy.github.io/glamhack2026_photochrom/index.html
 - **Images on the Map** [https://nbtkmy.github.io/wiki-qlever/](https://nbtkmy.github.io/wiki-qlever/)
+- **Images on Wikimendia** [commons.wikimedia.org Category:Photochrom_pictures_in_the_Zentralbibliothek_Zürich](https://commons.wikimedia.org/wiki/Category:Photochrom_pictures_in_the_Zentralbibliothek_Z%C3%BCrich)
 
 ## Data and licences
 
