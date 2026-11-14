@@ -33,6 +33,7 @@ or `images-legacy-2k.zip`). The images are not in this repo.
 | `data/catalog.json` | 9,604 | `id` (MMS ID) | **derived**: compact join of the files above for the web app, built by `scripts/build_catalog.py`; field list and provenance in its `fields` block. Records starting after 1914 are excluded (6, listed in its `excluded` block): photochrom production ended 1914 |
 | `data/commons-images.csv` | 167 | `commons_file` (= `commons_file` in artwork-pairs.csv) | **derived**: direct, CORS-enabled image URLs for the Commons images of the painting pairs (`original_url`, `thumb_url` about 1,920 px or the original if smaller, with real sizes), plus `license`, `artist`, `credit`, `attribution_required`. `scripts/resolve_commons_urls.py`, Commons API `imageinfo`, 14.11.2026. 158 public domain, 9 under CC licenses (8 need attribution) |
 | `data/artwork-pairs.csv` | 240 | `mms_id` | **photochroms that reproduce paintings, matched to the original artwork** (see below) |
+| `data/candidates.csv` | 0 | `mms_id_a`, `mms_id_b` | **candidate pairs of two photochroms** for the Candidates tab, written by pairing methods (see below) |
 
 ## Links between files
 
@@ -60,6 +61,22 @@ rule-based (regular expressions), machine-made, **unreviewed**. All other cells 
   Photochromnummer” are not taken. Suffixes are dropped (`1381.B.P.Z.` → `1381`, `8337-2. P.Z.` → `8337`).
 - 89 numbers are printed on the back, not the front (noted as `auf der Rückseite`); they are
   included.
+
+## candidates.csv
+
+Pairs of two photochroms that the Candidates tab suggests with “Find pairs” (when one of the two is
+in the user's selection). Every pairing method appends its own rows, so new methods need no code change.
+
+| Column | Content |
+|---|---|
+| `mms_id_a`, `mms_id_b` | MMS IDs of the two photochroms (order does not matter; the selected one is shown on the left) |
+| `method` | method and version, e.g. `siglip2-printarea-cosine-v1` |
+| `score` | similarity or confidence, higher = closer; pairs are sorted by it |
+| `retrieved` | date the row was made, `YYYY-MM-DD` |
+| `review_status` | `unreviewed`, `confirmed` or `rejected` |
+
+Painting pairs are not in this file: for works of the genre “Reproduction” the tab takes the painting
+from `artwork-pairs.csv`.
 
 ## artwork-pairs.csv
 

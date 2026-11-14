@@ -43,6 +43,11 @@ Data: `scripts/build_catalog.py` joins the Zenodo CSVs into `data/catalog.json` 
 
 Comparing images side by side is one of the key methods in art history. This tab creates candidate pairs for the Image Comparison tab.
 
+Workflow: Media Library (selection) → Candidates → Image Comparison (exactly two images).
+
+- **Pick two, compare**: the selected works appear as cards with a checkbox. Ticking two enables the **Compare** button in the selection bar at the bottom (same bar as in the Media Library: count, export, import, clear), which opens them as a pair in the Image Comparison tab. A third tick replaces the oldest.
+- **Find pairs**: suggests pairs for the selected works, each with its own Compare button. Sources: `data/candidates.csv` (photochrom–photochrom pairs written by pairing methods, format in `docs/data.md`); for works of the genre “Reproduction” the painting from `artwork-pairs.csv`. Image similarity via embeddings (in progress) will write its pairs to `candidates.csv`.
+
 The left image is always a main image from the Photochrom collection. The right image can be:
 
 - another image from the same collection that is related to the main image in some way

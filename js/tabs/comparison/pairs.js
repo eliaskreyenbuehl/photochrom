@@ -69,6 +69,27 @@ export async function loadSamplePairs() {
 }
 
 /**
+ * One side of a pair for a photochrom from the catalog (data/catalog.json record).
+ * Loaded in zoom quality via fullImageUrl(), 300 px thumbnail as fallback.
+ * `extraFields` are added to the metadata (e.g. how the pair was found).
+ */
+export function photochromSide(rec, extraFields = {}) {
+  return {
+    role: 'photochrom',
+    label: 'Photochrom',
+    title: rec.t,
+    year: dateLabel(rec),
+    url: fullImageUrl(rec, PHOTOCHROM_ZOOM_SIZE),
+    fallbackUrl: imageUrl(rec, 300), // own thumbnail service, if the full image is missing
+    credit: `${rec.t}${rec.d ? `, ${rec.d}` : ''}. Zentralbibliothek Zürich, Public Domain Mark`,
+    creditUrl: rec.doi ? doiUrl(rec.doi) : recordUrl(rec),
+    fields: { title: rec.t, date: rec.d, place: rec.p, countries: rec.c.join(', '), mms_id: rec.id,
+      subset: rec.s === 'r' ? 'recatalogued (IIIF)' : 'legacy', ...extraFields },
+    recordId: rec.id,
+  };
+}
+
+/**
  * Painting pairs from the catalog: photochroms that reproduce a painting, matched to the
  * painting via Wikidata (data/artwork-pairs.csv, machine-made, unreviewed), with a
  * CORS-enabled Commons image (data/commons-images.csv). Left = painting, right = photochrom,
@@ -101,19 +122,7 @@ export async function loadArtworkPairs() {
         fields: { ...pick(row, ['artist_', 'work_', 'note_work_', 'collection', 'location', 'inventory_number', 'museum_object_page', 'match_']),
           commons_license: img.license, commons_artist: img.artist, commons_credit: img.credit },
       },
-      right: {
-        role: 'photochrom',
-        label: 'Photochrom',
-        title: rec.t,
-        year: dateLabel(rec),
-        url: fullImageUrl(rec, PHOTOCHROM_ZOOM_SIZE),
-        fallbackUrl: imageUrl(rec, 300), // own thumbnail service, if the full image is missing
-        credit: `${rec.t}${rec.d ? `, ${rec.d}` : ''}. Zentralbibliothek Zürich, Public Domain Mark`,
-        creditUrl: rec.doi ? doiUrl(rec.doi) : recordUrl(rec),
-        fields: { title: rec.t, date: rec.d, place: rec.p, countries: rec.c.join(', '), mms_id: rec.id,
-          subset: rec.s === 'r' ? 'recatalogued (IIIF)' : 'legacy', match_status: row.match_status, review_status: row.review_status },
-        recordId: rec.id,
-      },
+      right: photochromSide(rec, { match_status: row.match_status, review_status: row.review_status }),
       group: 'painting',
     });
   }
