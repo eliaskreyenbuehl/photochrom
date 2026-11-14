@@ -65,7 +65,8 @@ Output and extensions:
 
 ### Image Comparison Tab
 
-- **Load 2 images** (for now static urls, later from gallery)
+- **Load 2 images**: two sample pairs, plus 178 photochrom–painting pairs from the catalog (`artwork-pairs.csv`, Wikidata match, unreviewed; painting from Commons via `commons-images.csv`, photochrom via `fullImageUrl()` in zoom quality: e-rara up to 4,000 px, legacy 2K scan from Hugging Face, 300 px thumbnail as fallback). Later also pairs from Pair Matching.
+- **Crop to print** (default on): photochroms with a box in `print-area.csv` are cropped to the print when loading, so view, alignment, overlap %, differences, color analysis and screenshots never see the color chart. The status line says when an image is cropped; unticking shows the whole scan.
 - **Display images side by side** for comparison
 - **Display image metadata** (loaded via seperate local csv)
 - **Allow for image manipulation** (brightness, saturation, etc.)
@@ -197,8 +198,8 @@ js/vendor/panzoom/        Panzoom 4.6.2 (MIT, vendored ES module + license) — 
 js/tabs/comparison.js     Image Comparison tab: wires the modules below together
 js/tabs/comparison/       sub-modules of the comparison tab
   store.js                  tab state (pair, images, view, alignment matrix, adjustments) + update/subscribe
-  pairs.js                  comparison pairs from data/sample/sample-metadata.csv
-  media.js                  image loading, display canvases, canvas helpers (createCanvas, canvasFrom, imageDataOf)
+  pairs.js                  comparison pairs: samples (data/sample/sample-metadata.csv) and photochrom–painting pairs (artwork-pairs.csv + commons-images.csv + catalog)
+  media.js                  image loading (crop to print area, thumbnail fallback), display canvases, canvas helpers (createCanvas, canvasFrom, imageDataOf)
   viewer.js                 side-by-side / overlay / slider / difference views, view toolbar (Move overlay / Pan tools, zoom), drag + keyboard
   zoom.js                   pan & zoom (pinch, Ctrl/⌘ + scroll, double-click, keys) on top of Panzoom
   controls.js               sidebar: overlay & alignment, overlap %, differences, adjustments
@@ -218,7 +219,8 @@ js/tabs/comparison/       sub-modules of the comparison tab
   pixels.js                 image loading, pixel extraction, seeded sampling
   palette.js                palette extraction (k-means in Lab)
   cie1931.js                CIE 1931 spectral locus + chromaticity diagram background
-js/lib/catalog.js         loadCatalog() for data/catalog.json, thumbnail/IIIF image URLs (THUMB_IIIF_BASE), links, date labels
+js/lib/catalog.js         loadCatalog() for data/catalog.json, thumbnail/IIIF image URLs (THUMB_IIIF_BASE), fullImageUrl(), zoomSource(), links, date labels
+js/lib/print-area.js      loadPrintAreas(), printAreaFor(rec): print box without color chart from data/print-area.csv
 js/tabs/media-library.js  Media Library tab: wires the modules below together
 js/tabs/media-library/
   filters.js                filter model, matching, facet counts (no DOM)
@@ -287,7 +289,7 @@ showTab('comparison');
 - **Zoom/pan** (`zoom.js`) wraps Panzoom (vendored). Panzoom's focal-point math assumes the transformed element starts at its parent's top-left, so the zoom wrapper spans the viewport and centers its content itself. The stage routes pointer events by hand (`noBind`) so a drag does exactly one thing: pan, move the overlay or move the divider. Input conventions: pinch / Ctrl/⌘ + scroll zoom the view, plain scroll stays with the page (except in the modal image dialog, `wheelZoom: true`, where there is no page to scroll — the page is locked via `html.has-modal`), Shift/Alt + scroll only touch the overlay (Move tool), Space or middle button = temporary pan, a second finger always pinch-zooms. "Link" in the side-by-side view is relative: each change of one frame (zoom factor, pan as a fraction of the image size) is applied to the other, so offsets made while unlinked survive re-linking; "Fit" fits both silently. The slider divider lives in screen space (a child of the stage, not of the zoomed layer): it keeps its screen position while panning/zooming and `store.divider` (fraction of the base width) is recomputed from the zoom state, so it never leaves the view. Marks that belong to image positions but must keep their screen size (difference boxes) are HTML inside the zoomed layer sized with `calc(... * var(--inv-zoom))` — use widths or `box-shadow`, not borders: Chrome rounds borders below 1 px up to 1 px before the zoom scales them. Low-resolution layers (the heatmap) simply scale with the image.
 - **Auto-align** (`align.js`, OpenCV.js lazy-loaded from jsDelivr, ≈10 MB): grayscale + CLAHE, ORB then AKAZE (SIFT is not in the build), ratio test, RANSAC homography, plus a plausibility check (convex quad, sane area). It only works when the reproduction is a photographic copy: the Gleyre pair aligns (~330 inliers), the Correggio photochrom is a redrawn detail and does not — manual alignment is the fallback.
 - **Difference map** (`difference.js`): photochroms are recolored, so it compares *locally normalised luminance* (structure), not colors. The threshold mapping `1.2 · 0.25^(sensitivity/100)` was calibrated on the aligned Gleyre pair (median score ≈ 0.17, 99th percentile ≈ 0.66); image borders and the overlap edge are excluded because local statistics are unreliable there. It is a heuristic: misalignment shows up as differences along edges.
-- **Overlap %** comes from clipping the mapped overlay quad against the base rectangle. Scan borders and color charts count as image area until cropping them out is implemented.
+- **Overlap %** comes from clipping the mapped overlay quad against the base rectangle. With "Crop to print" on, photochroms are cropped to the print first, so color charts and scan borders no longer count (boxes are machine-generated; about 1 in 10 is imperfect).
 
 ### Constraints & gotchas
 

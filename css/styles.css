@@ -101,6 +101,16 @@ body {
   color: var(--muted);
 }
 
+/* "Crop to print" checkbox: label next to the box, aligned with the other controls' fields */
+#panel-comparison .cmp-crop {
+  flex-direction: row;
+  align-items: center;
+  align-self: flex-end;
+  padding-bottom: 0.4rem;
+  color: var(--fg);
+  cursor: pointer;
+}
+
 #panel-comparison select,
 #panel-comparison input[type="number"] {
   font: inherit;
