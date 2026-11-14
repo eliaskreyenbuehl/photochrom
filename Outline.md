@@ -65,7 +65,7 @@ Output and extensions:
 
 ### Image Comparison Tab
 
-- **Load 2 images**: two sample pairs, plus 178 photochrom–painting pairs from the catalog (`artwork-pairs.csv`, Wikidata match, unreviewed; painting from Commons via `commons-images.csv`, photochrom via `fullImageUrl()` in zoom quality: e-rara up to 4,000 px, legacy 2K scan from Hugging Face, 300 px thumbnail as fallback). Later also pairs from the Candidates tab.
+- **Load 2 images**: a search field per image ("Left image", "Right image") at the top of the tab: search the media library or paste a Wikimedia Commons / e-rara / swisscollections link. Starts with the Gleyre sample pair. Photochroms load in zoom quality via `fullImageUrl()` (e-rara up to 4,000 px, legacy 2K scan from Hugging Face, 300 px thumbnail as fallback). Later also pairs from the Candidates tab (via `setComparisonPair()`).
 - **Crop to print** (default on): photochroms with a box in `print-area.csv` are cropped to the print when loading, so view, alignment, overlap %, differences, color analysis and screenshots never see the color chart. The status line says when an image is cropped; unticking shows the whole scan.
 - **Display images side by side** for comparison
 - **Display image metadata** (loaded via seperate local csv)
@@ -194,11 +194,17 @@ js/lib/plotly.js          loadPlotly(): lazy-loads Plotly from its CDN on first 
 js/lib/opencv.js          loadOpenCV(): lazy-loads OpenCV.js (~10 MB) for auto-align
 js/lib/script.js          loadScript(url): inject a classic <script> once (used by the loaders above)
 js/lib/download.js        canvasToBlob(), downloadBlob() — saving generated PNGs
+js/lib/sources/           image sources (fetch layer): where images come from, independent of the UI
+  index.js                  registry: searchImages(), imageFromLink(), parseLink() — the only module the UI uses
+  image.js                  shared image shape (documented there), imageName(), stripHtml(), fetchJson()
+  catalog.js                media library (catalog.json, thumbnails, e-rara IIIF, Hugging Face 2K scans): search, own links
+  erara.js                  e-rara items outside the library (IIIF manifest / image service)
+  commons.js                Wikimedia Commons file pages (Commons API)
 js/vendor/panzoom/        Panzoom 4.6.2 (MIT, vendored ES module + license) — pan/zoom of the comparison views
 js/tabs/comparison.js     Image Comparison tab: wires the modules below together
 js/tabs/comparison/       sub-modules of the comparison tab
   store.js                  tab state (pair, images, view, alignment matrix, adjustments) + update/subscribe
-  pairs.js                  comparison pairs: samples (data/sample/sample-metadata.csv) and photochrom–painting pairs (artwork-pairs.csv + commons-images.csv + catalog)
+  pairs.js                  sample pairs (data/sample/sample-metadata.csv); the tab starts with one
   media.js                  image loading (crop to print area, thumbnail fallback), display canvases, canvas helpers (createCanvas, canvasFrom, imageDataOf)
   viewer.js                 side-by-side / overlay / slider / difference views, view toolbar (Move overlay / Pan tools, zoom), drag + keyboard
   zoom.js                   pan & zoom (pinch, Ctrl/⌘ + scroll, double-click, keys) on top of Panzoom
@@ -210,6 +216,7 @@ js/tabs/comparison/       sub-modules of the comparison tab
   difference.js             structural difference map + regions
   diffview.js               computes the difference map for the viewer (heatmap canvas + HTML region boxes)
   screenshot.js             PNG export of the current view (or the zoomed-in part) incl. credits
+  image-picker.js           "Left image" / "Right image" search fields at the top: choose from the library or a pasted link
   image-dialog.js           dialog with the full (zoomable) image and its metadata, resizable split; opened from the side-by-side view
   metadata.js               metadata of one image (key fields + all fields)
   analysis.js               color analysis section (UI: image/plot type/sample size chooser, plot)
@@ -280,6 +287,7 @@ showTab('comparison');
 
 ### Image Comparison tab: how it works
 
+- **Image sources** (`js/lib/sources/`): the UI never builds image URLs itself; it asks the registry (`searchImages()`, `imageFromLink()`), which returns images in one shape (see `image.js`). A source is a module with `search()` and/or `fromLink()`; to add one (e.g. Wikidata, an API instead of `catalog.json`) write the module and add it to `SOURCES` in `index.js`. Links are tried catalog first, so e-rara / DOI / swisscollections links to photochroms in the library get the catalog record (metadata, print-area crop). CORS: Commons API and images, e-rara IIIF manifests and images allow it; e-rara DOI landing pages do not, so DOIs are only resolved through the catalog. Choosing an image makes a new pair (the other image is kept); there is no pair selector.
 - **Naming images**: never by role ("Original"/"Photochrom") — a pair can be two photochroms. An image is named by its photochrom number (if any) and title, `imageName()` in `pairs.js`, e.g. "No. 73 · Les illusions perdues"; where that does not fit (selectors, legends, sentences about overlap) use its position "Left"/"Right" (`POSITION` in `store.js`, `image.position`). `role` only selects the metadata fields. The number comes from `photochrom_number` (sample CSV) or the catalog field `n`.
 - **State**: `comparison/store.js` holds the tab state. Change it only via `update(patch, reason)`; subscribers update only what the reason (`'pair' | 'view' | 'swap' | 'transform' | 'opacity' | 'blend' | 'divider' | 'adjust' | 'diff'`) affects — dragging the overlay fires `'transform'` on every pointer move, so that path must stay cheap (no layout reads, no DOM rebuilding).
 - **Per-view visibility**: the panel carries `data-view`; mark elements with `data-only="overlay slider"` etc. and CSS hides them in other views. Don't toggle `hidden` per view in JS.

@@ -14,7 +14,7 @@
 //   }
 //   role: 'original' | 'photochrom' (selects the metadata fields; both sides may be photochroms)
 //   number: photochrom number, if any; label: display name, e.g. "No. 73 · Le soir"
-//     (optional, built from number + title by imageName() in comparison/pairs.js)
+//     (optional, built from number + title by imageName() in js/lib/sources/image.js)
 //   title, year: shown under the image; fields: all metadata { column: value }
 
 const SELECTION_KEY = 'photochrom.selection.v1';
