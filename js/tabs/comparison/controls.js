@@ -1,6 +1,8 @@
 // Sidebar controls of the comparison tab: overlay & alignment, differences,
 // per-image adjustments. Reads and writes the shared store.
 
+import { icon } from '../../lib/ui/icons.js';
+import { infoTip } from '../../lib/ui/info.js';
 import { ADJUSTMENTS, defaultAdjustments, isDefault } from './adjustments.js';
 import { invert, overlapStats } from './geometry.js';
 import { SIDES, baseImage, defaultManual, isAligned, otherSide, overlayImage, overlayMatrix, resetAlignment, setManual, store, subscribe, update } from './store.js';
@@ -30,8 +32,8 @@ export function createControls({ onAutoAlign }) {
       </label>
       ${rangeRow('opacity', 'Opacity', 0, 100, 1, 'data-only="overlay"')}
       <div class="cmp-check" data-only="overlay">
-        <label><input type="checkbox" name="difference-blend"> Difference blend</label>
-        <p class="cmp-note">Shows the difference of both images: matching areas turn dark, misaligned edges light up. Most useful at 100 % opacity.</p>
+        <label class="check"><input type="checkbox" name="difference-blend"> Difference blend</label>
+        ${infoTip('Shows the difference of both images: matching areas turn dark, misaligned edges light up. Most useful at 100 % opacity.', 'About Difference blend')}
       </div>
       ${rangeRow('divider', 'Divider', 0, 100, 0.5, 'data-only="slider"')}
       ${rangeRow('scale', 'Scale', -300, 300, 1)}
@@ -41,20 +43,20 @@ export function createControls({ onAutoAlign }) {
         <label class="control"><span>Offset Y (px)</span><input type="number" name="ty" step="1"></label>
       </div>
       <div class="button-row">
-        <button type="button" class="button button-primary" data-action="auto-align">Auto-align</button>
-        <button type="button" class="button" data-action="reset-manual" title="Undo manual move, scale and rotation">Undo manual</button>
-        <button type="button" class="button" data-action="reset-fit" title="Discard the alignment and fit the overlay into the base">Reset</button>
+        <button type="button" class="btn btn-primary" data-action="auto-align" title="Find matching keypoints and align the overlay (OpenCV, loads about 10 MB on first use)">${icon('align')}<span class="btn-label">Auto-align</span></button>
+        <button type="button" class="btn" data-action="reset-manual" title="Undo manual move, scale and rotation">${icon('undo')}<span class="btn-label">Undo manual</span></button>
+        <button type="button" class="btn" data-action="reset-fit" title="Discard the alignment and fit the overlay into the base">${icon('reset')}<span class="btn-label">Reset</span></button>
       </div>
       <p class="cmp-align-status" role="status" aria-live="polite"></p>
       <div class="cmp-overlap">
-        <h4>Overlap</h4>
+        <h4>Overlap ${infoTip('Computed from the overlay outline mapped onto the base image. With “Crop to print” on, color charts and scan borders are removed first; otherwise they count as image area.', 'About the overlap')}</h4>
         <ul class="cmp-overlap-stats"><li></li><li></li></ul>
         <p class="cmp-overlap-hint"></p>
       </div>
     </details>
 
     <details class="cmp-group" data-only="diff" open>
-      <summary>Differences</summary>
+      <summary>Differences ${infoTip('Compares the image <b>structure</b> (locally normalised brightness), not colors, because photochroms are recolored. A heuristic: misalignment also shows up as differences along edges. Align the images first.', 'About the difference map')}</summary>
       ${rangeRow('sensitivity', 'Sensitivity', 0, 100, 1)}
       ${rangeRow('heat', 'Heatmap opacity', 0, 100, 1)}
       <p class="cmp-diff-summary" role="status" aria-live="polite"></p>
@@ -62,22 +64,21 @@ export function createControls({ onAutoAlign }) {
     </details>
 
     <details class="cmp-group" open>
-      <summary>Adjustments</summary>
+      <summary>Adjustments ${infoTip('Apply to the display and screenshots, per image. The color analysis below always uses the original pixels.', 'About adjustments')}</summary>
       <fieldset class="segmented cmp-adjust-target">
         <legend>Image to edit</legend>
         ${SIDES.map(
           (side) => `
           <label>
             <input type="radio" name="adjust-side" value="${side}"${side === adjustSide ? ' checked' : ''}>
-            <span><span class="cmp-adjust-label"></span><span class="cmp-edited" hidden><span aria-hidden="true"> •</span><span class="sr-only"> (adjusted)</span></span></span>
+            <span><span class="cmp-adjust-label"></span><span class="cmp-edited" hidden><span aria-hidden="true"> •</span><span class="visually-hidden"> (adjusted)</span></span></span>
           </label>`
         ).join('')}
       </fieldset>
       <div class="cmp-adjust">
         ${ADJUSTMENTS.map((a) => rangeRow(`adj-${a.id}`, a.label, a.min, a.max, 1)).join('')}
-        <button type="button" class="button" data-action="reset-adjust">Reset</button>
+        <button type="button" class="btn" data-action="reset-adjust" title="Reset the adjustments of this image">${icon('reset')}<span class="btn-label">Reset</span></button>
       </div>
-      <p class="cmp-note">Applies to the display and screenshots. The color analysis below always uses the original pixels.</p>
     </details>
   `;
 
@@ -158,7 +159,6 @@ export function createControls({ onAutoAlign }) {
     else if (baseCovered < 0.9 && overlayInside < 0.9) message = 'The images only partly overlap.';
     else message = 'Both images show essentially the same section.';
     if (!isAligned()) message += ' Not aligned yet: run Auto-align (or align manually) for meaningful numbers.';
-    message += ' Scan borders and color charts count as image area.';
     overlapHint.textContent = message;
   }
 

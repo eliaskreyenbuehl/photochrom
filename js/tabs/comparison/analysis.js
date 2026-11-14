@@ -11,6 +11,7 @@
 // points in the plot.
 
 import { loadPlotly } from '../../lib/plotly.js';
+import { infoTip } from '../../lib/ui/info.js';
 import { assignPixels, extractPalette } from './palette.js';
 import { createPaletteView } from './palette-view.js';
 import { analyzeImage, MAX_SAMPLE } from './pixels.js';
@@ -95,15 +96,14 @@ export function render(container) {
     <div class="analysis-plot"></div>
 
     <div class="analysis-palette-header">
-      <h4>Color palette</h4>
-      <label class="control">
+      <h4>Color palette ${infoTip('Dominant colors found by k-means clustering in CIE Lab; percentages are the share of pixels closest to each color. Select a color to highlight where it occurs, in the image and in the plot above. The copy buttons copy the hex values or the palette as an image.', 'About the color palette')}</h4>
+      <label class="control control-inline">
         <span>Colors</span>
         <select name="palette-size">
           ${PALETTE_SIZES.map((n) => option(n, n, n === state.paletteSize)).join('')}
         </select>
       </label>
     </div>
-    <p class="analysis-note">Dominant colors found by k-means clustering in CIE Lab; percentages are the share of pixels closest to each color. Select a color to highlight where it occurs, in the image and in the plot above.</p>
   `;
   palettes = createPaletteView();
   section.append(palettes.element);

@@ -10,6 +10,7 @@
 import { escapeHtml, hasImage, imageUrl } from '../../lib/catalog.js';
 import { isCropping } from '../../lib/print-area.js';
 import { isSelected, setSelected } from '../../state.js';
+import { bindSelectAndOpen } from '../../lib/ui/select-open.js';
 
 const MIN_COL = 190;   // px; the column count follows the available width
 const GAP = 6;
@@ -39,21 +40,14 @@ export function createMosaic(container, { onOpen }) {
   let rendered = '';
   let frame = 0;
 
-  spacer.addEventListener('change', (e) => {
-    const box = e.target.closest('input[data-id]');
-    if (box) setSelected(box.dataset.id, box.checked);
-  });
-  spacer.addEventListener('click', (e) => {
-    if (e.target.closest('input, label')) return;
-    const tile = e.target.closest('[data-i]');
-    if (tile) onOpen(items[Number(tile.dataset.i)]);
-  });
-  spacer.addEventListener('keydown', (e) => {
-    const tile = e.target.closest('[data-i]');
-    if (tile && e.target === tile && (e.key === 'Enter' || e.key === ' ')) {
-      e.preventDefault();
-      onOpen(items[Number(tile.dataset.i)]);
-    }
+  // Click: select; double-click or Enter: details.
+  bindSelectAndOpen(spacer, {
+    item: (el) => el.closest('[data-i]'),
+    toggle: (tile) => {
+      const r = items[Number(tile.dataset.i)];
+      setSelected(r.id, !isSelected(r.id));
+    },
+    open: (tile) => onOpen(items, Number(tile.dataset.i)),
   });
   scroll.addEventListener('scroll', () => {
     cancelAnimationFrame(frame);
@@ -110,11 +104,12 @@ export function createMosaic(container, { onOpen }) {
     const p = pos[i];
     const sel = isSelected(r.id);
     const title = escapeHtml(r.t);
+    // The tile is the checkbox (Space toggles, Enter opens details); the box inside is only visual.
     return `
-      <div class="ml-tile${sel ? ' selected' : ''}" data-i="${i}" tabindex="0" role="button" aria-label="${title}" title="${title}"
+      <div class="ml-tile${sel ? ' selected' : ''}" data-i="${i}" tabindex="0" role="checkbox" aria-checked="${sel}" aria-label="${title}" title="${title}"
         style="left:${p.x}px;top:${p.y}px;width:${colW}px;height:${p.h}px">
         ${imgHtml(r, p)}
-        <label class="ml-tile-check"><input type="checkbox" data-id="${r.id}" ${sel ? 'checked' : ''}><span class="visually-hidden">Use as main image: ${title}</span></label>
+        <span class="check-box" aria-hidden="true"></span>
         <span class="ml-tile-caption">${title}</span>
       </div>`;
   }
@@ -151,9 +146,10 @@ export function createMosaic(container, { onOpen }) {
       render(true);
     },
     refresh() {
-      for (const box of spacer.querySelectorAll('input[data-id]')) {
-        box.checked = isSelected(box.dataset.id);
-        box.closest('.ml-tile').classList.toggle('selected', box.checked);
+      for (const tile of spacer.querySelectorAll('[data-i]')) {
+        const sel = isSelected(items[Number(tile.dataset.i)].id);
+        tile.classList.toggle('selected', sel);
+        tile.setAttribute('aria-checked', String(sel));
       }
     },
     /** Called when the view becomes visible or its width changed (sizes were 0 while hidden). */

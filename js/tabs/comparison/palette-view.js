@@ -6,6 +6,7 @@
 
 import { canvasToBlob, downloadBlob } from '../../lib/download.js';
 import { createCanvas } from './media.js';
+import { icon } from '../../lib/ui/icons.js';
 
 const SWATCH = 120; // px per color in the copied palette image
 
@@ -76,7 +77,8 @@ function paletteImage(palette) {
 }
 
 function button(text, action) {
-  const el = Object.assign(document.createElement('button'), { type: 'button', className: 'button button-small', textContent: text });
+  const el = Object.assign(document.createElement('button'), { type: 'button', className: 'btn btn-sm' });
+  if (text) el.innerHTML = `${icon('copy')}<span class="btn-label">${text}</span>`;
   el.dataset.action = action;
   return el;
 }
@@ -95,7 +97,8 @@ function paletteBlock(entry) {
 
   const head = document.createElement('div');
   head.className = 'palette-head';
-  const title = Object.assign(document.createElement('h5'), { textContent: label });
+  // One line (full title on hover), so both palettes' bars start at the same height.
+  const title = Object.assign(document.createElement('h5'), { textContent: label, title: label });
   const actions = document.createElement('div');
   actions.className = 'palette-actions';
   actions.append(button('Copy hex', 'copy-hex'), button('Copy image', 'copy-image'));

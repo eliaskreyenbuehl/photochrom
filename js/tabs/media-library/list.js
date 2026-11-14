@@ -3,6 +3,7 @@
 
 import { dateLabel, escapeHtml, imageUrl } from '../../lib/catalog.js';
 import { isSelected, setSelected } from '../../state.js';
+import { bindSelectAndOpen } from '../../lib/ui/select-open.js';
 
 const ROW_H = 64;
 const OVERSCAN = 6;
@@ -17,7 +18,7 @@ const COLUMNS = [
 export function createList(container, { genres, onOpen }) {
   container.innerHTML = `
     <div class="ml-list-head" role="row">
-      <span class="col-check"><span class="visually-hidden">Main image</span></span>
+      <span class="col-check"><span class="visually-hidden">Selected</span></span>
       <span class="col-img"></span>
       ${COLUMNS.map((c) => `<button type="button" class="col-${c.key} sort" data-sort="${c.key}">${c.label}<span class="sort-mark" aria-hidden="true"></span></button>`).join('')}
       <span class="col-source">Source</span>
@@ -46,21 +47,14 @@ export function createList(container, { genres, onOpen }) {
     render(true);
   });
 
-  spacer.addEventListener('change', (e) => {
-    const box = e.target.closest('input[type=checkbox][data-id]');
-    if (box) setSelected(box.dataset.id, box.checked);
-  });
-  spacer.addEventListener('click', (e) => {
-    if (e.target.closest('input, a, label')) return;
-    const row = e.target.closest('[data-row]');
-    if (row) onOpen(rows[Number(row.dataset.row)]);
-  });
-  spacer.addEventListener('keydown', (e) => {
-    const row = e.target.closest('[data-row]');
-    if (row && (e.key === 'Enter' || e.key === ' ') && e.target === row) {
-      e.preventDefault();
-      onOpen(rows[Number(row.dataset.row)]);
-    }
+  // Click: select; double-click or Enter: details.
+  bindSelectAndOpen(spacer, {
+    item: (el) => el.closest('[data-row]'),
+    toggle: (row) => {
+      const r = rows[Number(row.dataset.row)];
+      setSelected(r.id, !isSelected(r.id));
+    },
+    open: (row) => onOpen(rows, Number(row.dataset.row)),
   });
   scroll.addEventListener('scroll', () => render(), { passive: true });
   new ResizeObserver(() => render(true)).observe(scroll);
@@ -79,14 +73,14 @@ export function createList(container, { genres, onOpen }) {
 
   function rowHtml(r, i) {
     const img = imageUrl(r, 120);
-    const checked = isSelected(r.id) ? 'checked' : '';
+    const sel = isSelected(r.id);
     const source = [
-      r.iiif ? '<span class="badge iiif" title="Recatalogued, IIIF image">IIIF</span>' : '<span class="badge legacy" title="Legacy record, no IIIF">legacy</span>',
-      r.art ? `<span class="badge art" title="Reproduces a painting (match: ${escapeHtml(r.art)})">painting</span>` : '',
+      r.iiif ? '<span class="badge badge-accent" title="Recatalogued, IIIF image">IIIF</span>' : '<span class="badge" title="Legacy record, 2K scan, no IIIF">legacy</span>',
+      r.art ? `<span class="badge badge-art" title="Reproduces a painting (match: ${escapeHtml(r.art)}, machine-made)">painting</span>` : '',
     ].join('');
     return `
-      <div class="ml-row${checked ? ' selected' : ''}" data-row="${i}" tabindex="0" style="top:${i * ROW_H}px">
-        <label class="col-check"><input type="checkbox" data-id="${r.id}" ${checked}><span class="visually-hidden">Use as main image: ${escapeHtml(r.t)}</span></label>
+      <div class="ml-row${sel ? ' selected' : ''}" data-row="${i}" tabindex="0" role="checkbox" aria-checked="${sel}" aria-label="${escapeHtml(r.t)}" style="top:${i * ROW_H}px">
+        <span class="col-check"><span class="check-box" aria-hidden="true"></span></span>
         <span class="col-img">${img ? `<img src="${img}" alt="" loading="lazy" decoding="async">` : '<span class="no-img" title="No online image yet">–</span>'}</span>
         <span class="col-title" title="${escapeHtml(r.t)}">${escapeHtml(r.t)}</span>
         <span class="col-date">${escapeHtml(dateLabel(r))}</span>
@@ -117,10 +111,11 @@ export function createList(container, { genres, onOpen }) {
     },
     /** Re-renders checkboxes after the selection changed elsewhere. */
     refresh() {
-      // Update in place so the focused checkbox keeps focus.
-      for (const box of spacer.querySelectorAll('input[data-id]')) {
-        box.checked = isSelected(box.dataset.id);
-        box.closest('.ml-row').classList.toggle('selected', box.checked);
+      // Update in place so the focused row keeps focus.
+      for (const row of spacer.querySelectorAll('[data-row]')) {
+        const sel = isSelected(rows[Number(row.dataset.row)].id);
+        row.classList.toggle('selected', sel);
+        row.setAttribute('aria-checked', String(sel));
       }
     },
     /** Called when the view becomes visible (sizes were 0 while hidden). */
