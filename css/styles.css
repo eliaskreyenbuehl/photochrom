@@ -249,6 +249,9 @@ input:disabled { color: var(--muted); }
   color: var(--muted);
 }
 
+/* Label to the left of its field, on one line. */
+.control-inline { flex-direction: row; align-items: center; gap: 0.5rem; }
+
 /* Checkbox with its label to the right. */
 .check { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
 .check input { margin: 0; }
@@ -1078,7 +1081,7 @@ input:disabled { color: var(--muted); }
 #panel-comparison .analysis-palette-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 1rem 1.5rem;
   margin-top: 2rem;
 }
@@ -1092,15 +1095,23 @@ input:disabled { color: var(--muted); }
 
 #panel-comparison .palette-head {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
-#panel-comparison .palette h5 { margin: 0; font-size: 0.95rem; }
-#panel-comparison .palette-actions { display: flex; gap: 0.4rem; }
+#panel-comparison .palette h5 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#panel-comparison .palette-actions { display: flex; flex: none; gap: 0.4rem; }
 
 /* Palette bar: one block per color, width = share, hex + share inside. */
 #panel-comparison .palette-bar {

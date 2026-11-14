@@ -97,7 +97,7 @@ export function render(container) {
 
     <div class="analysis-palette-header">
       <h4>Color palette ${infoTip('Dominant colors found by k-means clustering in CIE Lab; percentages are the share of pixels closest to each color. Select a color to highlight where it occurs, in the image and in the plot above. The copy buttons copy the hex values or the palette as an image.', 'About the color palette')}</h4>
-      <label class="control">
+      <label class="control control-inline">
         <span>Colors</span>
         <select name="palette-size">
           ${PALETTE_SIZES.map((n) => option(n, n, n === state.paletteSize)).join('')}
