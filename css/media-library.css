@@ -1,4 +1,4 @@
-/* Media Library tab (and the candidate list in Pair Matching).
+/* Media Library tab (and the candidate list in the Candidates tab).
    Uses the variables from styles.css: --bg, --fg, --muted, --accent, --border. */
 
 :root {
@@ -208,7 +208,7 @@
 .ml-links { margin-top: 1rem; font-size: 0.88rem; }
 .ml-links a { color: var(--accent); }
 
-/* pair matching: candidate cards */
+/* Candidates tab: candidate cards */
 .pm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.8rem; list-style: none; padding: 0; }
 .pm-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .pm-card img, .pm-card .no-img { display: block; width: 100%; height: 150px; object-fit: cover; border-radius: 0; }
