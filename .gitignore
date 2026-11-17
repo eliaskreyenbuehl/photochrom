@@ -16,4 +16,6 @@ Thumbs.db
 /annotations/
 # exception: small sample for development
 !data/sample/*.jpg
+# exception: UI screenshots for the project description (dribdat)
+!docs/screenshots/*.jpg
 tests/*

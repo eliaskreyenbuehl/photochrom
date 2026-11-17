@@ -42,7 +42,8 @@ photochrom/
 ├── docs/
 │   ├── data.md                      the data in short: groups, files, keys, traps
 │   ├── background.md                how photochroms were made, why they differ from the originals
-│   └── notes-for-devs.md            image hosts and CORS, colour charts on scans, related work
+│   ├── notes-for-devs.md            image hosts and CORS, colour charts on scans, related work
+│   └── screenshots/                 screenshots and GIFs of the app (project description on dribdat)
 ├── prototypes/
 │   └── artwork-pairs.html           first comparison page: photochrom (IIIF) next to the original (Commons), German labels
 ├── .nojekyll                        disables Jekyll on GitHub Pages
